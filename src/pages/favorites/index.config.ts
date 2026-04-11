@@ -1,6 +1,6 @@
 export default typeof definePageConfig === 'function'
   ? definePageConfig({
-      navigationBarTitleText: '查词',
+      navigationBarTitleText: '收藏',
       enablePullDownRefresh: true
     })
-  : { navigationBarTitleText: '查词', enablePullDownRefresh: true }
+  : { navigationBarTitleText: '收藏', enablePullDownRefresh: true }
