@@ -48,6 +48,7 @@
     "@tarojs/runtime": "4.1.9",
     "@tarojs/shared": "4.1.9",
     "@tarojs/taro": "4.1.9",
+    "chinese-s2t": "^1.0.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",

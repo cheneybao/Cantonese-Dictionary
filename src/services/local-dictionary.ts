@@ -3,6 +3,8 @@
  * 无需后端，数据完全存储在浏览器本地
  */
 
+import { s2t } from 'chinese-s2t';
+
 // 数据类型定义
 export interface WordEntry {
   w: string;  // word
@@ -161,14 +163,24 @@ class LocalDictionaryService {
       const results: WordEntry[] = [];
       const request = store.openCursor();
 
+      // 简繁体转换：同时搜索简体和繁体
+      const traditionalQuery = s2t(query);
+      const searchTerms = [query];
+      if (traditionalQuery !== query) {
+        searchTerms.push(traditionalQuery);
+      }
+
       request.onsuccess = (event) => {
         const cursor = (event.target as IDBRequest).result;
 
         if (cursor && results.length < limit) {
           const word = cursor.value as WordEntry;
 
-          // 模糊匹配
-          if (word.w.includes(query) || word.j.includes(query.toLowerCase())) {
+          // 模糊匹配：检查是否匹配任何搜索词
+          const matchesWord = searchTerms.some(term => word.w.includes(term));
+          const matchesJyutping = word.j.includes(query.toLowerCase());
+
+          if (matchesWord || matchesJyutping) {
             results.push(word);
           }
 
@@ -197,37 +209,66 @@ class LocalDictionaryService {
     return new Promise((resolve, reject) => {
       const transaction = this.db!.transaction([STORE_NAME], 'readonly');
       const store = transaction.objectStore(STORE_NAME);
-      const request = store.get(word);
+
+      // 先尝试直接查询
+      let request = store.get(word);
+
+      // 如果是简体字，也需要尝试繁体查询
+      const traditionalWord = s2t(word);
+      const tryTraditional = word !== traditionalWord;
 
       request.onsuccess = () => {
-        const wordEntry = request.result as WordEntry | undefined;
+        let wordEntry = request.result as WordEntry | undefined;
+
+        // 如果直接查询不到，且是简体字，尝试用繁体查询
+        if (!wordEntry && tryTraditional) {
+          request = store.get(traditionalWord);
+          request.onsuccess = () => {
+            wordEntry = request.result as WordEntry | undefined;
+
+            if (!wordEntry) {
+              resolve(null);
+              return;
+            }
+
+            this.buildWordDetail(wordEntry, resolve);
+          };
+          request.onerror = () => {
+            reject(request.error);
+          };
+          return;
+        }
 
         if (!wordEntry) {
           resolve(null);
           return;
         }
 
-        // 获取相关词条（相同首字）
-        const related: string[] = [];
-        // 简化处理：不查询相关词以提高性能
-
-        const detail: WordDetail = {
-          id: word,
-          word: wordEntry.w,
-          jyutping: wordEntry.j,
-          pronunciation: wordEntry.j.split(' '),
-          definition: wordEntry.d || '来自 Rime Cantonese 词典',
-          examples: [],
-          related: related.length > 0 ? related.slice(0, 5) : []
-        };
-
-        resolve(detail);
+        this.buildWordDetail(wordEntry, resolve);
       };
 
       request.onerror = () => {
         reject(request.error);
       };
     });
+  }
+
+  private buildWordDetail(wordEntry: WordEntry, resolve: (value: WordDetail | null) => void) {
+    // 获取相关词条（相同首字）
+    const related: string[] = [];
+    // 简化处理：不查询相关词以提高性能
+
+    const detail: WordDetail = {
+      id: wordEntry.w,
+      word: wordEntry.w,
+      jyutping: wordEntry.j,
+      pronunciation: wordEntry.j.split(' '),
+      definition: wordEntry.d || '来自 Rime Cantonese 词典',
+      examples: [],
+      related: related.length > 0 ? related.slice(0, 5) : []
+    };
+
+    resolve(detail);
   }
 
   // 获取联想建议
