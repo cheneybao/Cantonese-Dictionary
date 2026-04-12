@@ -127,8 +127,17 @@ const WordDetailPage = () => {
 
   const saveToHistory = async (item: WordDetail) => {
     try {
-      const history = await Taro.getStorage({ key: 'search_history' })
-      const historyList: WordDetail[] = history.data || []
+      let historyList: WordDetail[] = []
+
+      // 尝试获取现有历史记录
+      try {
+        const history = await Taro.getStorage({ key: 'search_history' })
+        historyList = history.data || []
+      } catch (getError) {
+        // 首次使用，storage 中没有这个 key，忽略错误
+        console.log('首次使用历史记录，创建新的列表')
+        historyList = []
+      }
 
       // 检查是否已存在，存在则移到最前面
       const existingIndex = historyList.findIndex(h => h.word === item.word)
