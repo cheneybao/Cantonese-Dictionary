@@ -179,16 +179,32 @@ export class DictionaryService implements OnModuleInit {
     let examples = [];
     if (result.example) {
       try {
-        // 例句格式：中文句子|粤拼|英文翻译（可选）
+        // 例句格式1：中文句子|粤拼|英文翻译（可选）
+        // 例句格式2：中文句子（简单格式，只有中文）
         const exampleLines = result.example.split('\n');
-        examples = exampleLines.map(line => {
-          const parts = line.split('|');
-          return {
-            chinese: parts[0] || '',
-            jyutping: parts[1] || '',
-            english: parts[2] || undefined
-          };
-        }).filter(ex => ex.chinese && ex.jyutping);
+        examples = exampleLines
+          .map(line => {
+            const trimmed = line.trim();
+            if (!trimmed) return null;
+
+            if (trimmed.includes('|')) {
+              // 格式1：包含分隔符
+              const parts = trimmed.split('|');
+              return {
+                chinese: parts[0] || '',
+                jyutping: parts[1] || '',
+                english: parts[2] || undefined
+              };
+            } else {
+              // 格式2：简单格式，只有中文
+              return {
+                chinese: trimmed,
+                jyutping: '',
+                english: undefined
+              };
+            }
+          })
+          .filter((ex): ex is {chinese: string, jyutping: string, english?: string} => ex !== null && ex.chinese !== '');
       } catch (error) {
         console.error('解析例句失败:', error);
       }

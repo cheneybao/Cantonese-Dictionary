@@ -93,7 +93,7 @@ for (const initial in syllableIndex) {
 
 // 导出数据
 const dictionaryData = {
-  v: '1.3.0',
+  v: '1.4.0',
   date: new Date().toISOString(),
   stats: {
     words: words.length,

@@ -446,9 +446,11 @@ const WordDetailPage = () => {
                       <Text className="block text-base text-gray-900 mb-1">
                         {example.chinese}
                       </Text>
-                      <Text className="block text-sm font-mono text-blue-600 mb-1">
-                        {example.jyutping}
-                      </Text>
+                      {example.jyutping && (
+                        <Text className="block text-sm font-mono text-blue-600 mb-1">
+                          {example.jyutping}
+                        </Text>
+                      )}
                       {example.english && (
                         <Text className="block text-xs text-gray-500 italic">
                           {example.english}

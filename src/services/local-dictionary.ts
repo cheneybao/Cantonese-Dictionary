@@ -434,13 +434,52 @@ class LocalDictionaryService {
     const related: string[] = [];
     // 简化处理：不查询相关词以提高性能
 
+    // 解析例句（如果存在）
+    let examples: Array<{
+      chinese: string;
+      jyutping: string;
+      english?: string;
+    }> = [];
+    if (wordEntry.e) {
+      try {
+        // 例句格式1：中文句子|粤拼|英文翻译（可选）
+        // 例句格式2：中文句子（简单格式，只有中文）
+        const exampleLines = wordEntry.e.split('\n');
+        examples = exampleLines
+          .map(line => {
+            const trimmed = line.trim();
+            if (!trimmed) return null;
+
+            if (trimmed.includes('|')) {
+              // 格式1：包含分隔符
+              const parts = trimmed.split('|');
+              return {
+                chinese: parts[0] || '',
+                jyutping: parts[1] || '',
+                english: parts[2] || undefined
+              };
+            } else {
+              // 格式2：简单格式，只有中文
+              return {
+                chinese: trimmed,
+                jyutping: '',
+                english: undefined
+              };
+            }
+          })
+          .filter((ex): ex is {chinese: string, jyutping: string, english?: string} => ex !== null && ex.chinese !== '');
+      } catch (error) {
+        console.error('[LocalDictionary] 解析例句失败:', error);
+      }
+    }
+
     const detail: WordDetail = {
       id: wordEntry.w,
       word: wordEntry.w,
       jyutping: wordEntry.j,
       pronunciation: wordEntry.j.split(' '),
       definition: wordEntry.d || '来自 Rime Cantonese 词典',
-      examples: [],
+      examples,
       related: related.length > 0 ? related.slice(0, 5) : []
     };
 
