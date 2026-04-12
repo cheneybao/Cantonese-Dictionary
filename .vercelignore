@@ -8,16 +8,16 @@ dist
 build
 dist-*
 
-# Server directory (NestJS backend - not needed for H5 deployment)
-server
-
 # Test coverage
 coverage
 
 # Misc
 .DS_Store
 .env
-*.local
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
 
 # Logs
 *.log
