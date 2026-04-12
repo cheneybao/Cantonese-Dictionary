@@ -2,10 +2,10 @@
   "version": 2,
   "cleanUrls": true,
   "trailingSlash": false,
-  "buildCommand": "bash scripts/vercel-build.sh",
+  "buildCommand": "npm run build:web && mkdir -p dist-web/static/data && cp src/static/data/dictionary.json dist-web/static/data/",
   "outputDirectory": "dist-web",
-  "installCommand": "pnpm install",
-  "devCommand": "pnpm dev:web",
+  "installCommand": "npm install --legacy-peer-deps",
+  "devCommand": "npm run dev:web",
   "headers": [
     {
       "source": "/(.*)",
