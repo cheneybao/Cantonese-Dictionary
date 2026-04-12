@@ -169,11 +169,14 @@ export default function DebugPage() {
                 </Text>
               ) : (
                 logs.map((log, index) => (
-                  <Text key={index} className={`block text-xs font-mono mb-1 ${
-                    log.includes('[ERROR]') ? 'text-red-400' :
-                    log.includes('[WARN]') ? 'text-yellow-400' :
-                    'text-green-400'
-                  }`}>
+                  <Text
+                    key={index}
+                    className={`block text-xs font-mono mb-1 ${
+                      log.includes('[ERROR]') ? 'text-red-400' :
+                      log.includes('[WARN]') ? 'text-yellow-400' :
+                      'text-green-400'
+                    }`}
+                  >
                     {log}
                   </Text>
                 ))
@@ -191,10 +194,10 @@ export default function DebugPage() {
           </CardHeader>
           <CardContent>
             <Text className="block text-sm text-gray-600 mb-2">
-              1. 点击"测试词典 API"测试查询"你好"的词条详情
+              1. 点击&ldquo;测试词典 API&rdquo;测试查询&ldquo;你好&rdquo;的词条详情
             </Text>
             <Text className="block text-sm text-gray-600 mb-2">
-              2. 点击"检查 IndexedDB"查看数据库状态
+              2. 点击&ldquo;检查 IndexedDB&rdquo;查看数据库状态
             </Text>
             <Text className="block text-sm text-gray-600 mb-2">
               3. 查看日志输出，确认是否有错误

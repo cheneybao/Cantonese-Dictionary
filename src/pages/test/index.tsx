@@ -12,7 +12,7 @@ export default function TestPage() {
   const [loading, setLoading] = useState(false)
 
   const checkEnvironment = () => {
-    const useLocalAPI = import.meta.env.VITE_USE_LOCAL_API
+    const useLocalAPI = (import.meta as any).env?.VITE_USE_LOCAL_API
     const result = {
       value: useLocalAPI === undefined ? 'undefined (using default: true)' : useLocalAPI,
       isCorrect: useLocalAPI === undefined || useLocalAPI === 'true'
@@ -65,10 +65,9 @@ export default function TestPage() {
         request.onupgradeneeded = () => {
           // Database created/updated but no data yet
           const db = request.result
-          const objectStoreNames = Array.from(db.objectStoreNames)
           resolve({
             version: db.version,
-            objectStores,
+            objectStores: Array.from(db.objectStoreNames),
             message: 'Database exists but may be empty',
             isCorrect: true
           })
@@ -107,7 +106,7 @@ export default function TestPage() {
     // Check 3: IndexedDB
     const indexedDBResult = await checkIndexedDB()
     console.log('[Test] IndexedDB:', indexedDBResult)
-    setStatus(prev => ({ ...prev, indexedDB: indexedDBResult.isCorrect }))
+    setStatus(prev => ({ ...prev, indexedDB: (indexedDBResult as any).isCorrect }))
 
     setLoading(false)
   }

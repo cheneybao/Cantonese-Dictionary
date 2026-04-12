@@ -19,12 +19,16 @@ import { localDictionary } from '@/services/local-dictionary'
 const USE_LOCAL_API = String((import.meta as any).env?.VITE_USE_LOCAL_API || 'true') !== 'false';
 console.log('[Network] USE_LOCAL_API:', USE_LOCAL_API, 'VITE_USE_LOCAL_API:', (import.meta as any).env?.VITE_USE_LOCAL_API);
 
+// 确保 PROJECT_DOMAIN 有默认值
+const PROJECT_DOMAIN_VALUE = typeof PROJECT_DOMAIN !== 'undefined' ? PROJECT_DOMAIN : '';
+console.log('[Network] PROJECT_DOMAIN:', PROJECT_DOMAIN_VALUE);
+
 export namespace Network {
     const createUrl = (url: string): string => {
         if (url.startsWith('http://') || url.startsWith('https://')) {
             return url
         }
-        return `${PROJECT_DOMAIN}${url}`
+        return `${PROJECT_DOMAIN_VALUE}${url}`
     }
 
     // 本地 API 路由处理
