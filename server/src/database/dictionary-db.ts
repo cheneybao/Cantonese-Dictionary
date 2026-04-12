@@ -234,29 +234,26 @@ export class DictionaryDatabase {
       // 跳过注释和空行
       if (line.startsWith('#') || line.startsWith('---') || line.startsWith('...') || line.trim() === '') continue;
 
-      // 使用制表符分割，保持拼音中的空格
-      const parts = line.trim().split('\t');
+      // 先尝试制表符分割，如果没有则使用逗号分割
+      let parts: string[];
+      if (line.includes('\t')) {
+        parts = line.trim().split('\t');
+      } else {
+        parts = line.trim().split(',');
+      }
 
       if (parts.length >= 2) {
         const word = parts[0].trim();
         const pinyin = parts[1].trim();
-        const weight = parts.length >= 3 ? parseInt(parts[2]) || 0 : 0;
 
-        // 尝试提取释义和例句
-        let definition: string | undefined;
-        let example: string | undefined;
-
-        if (parts.length >= 4) {
-          definition = parts[3].trim();
-        }
-
-        if (parts.length >= 5) {
-          example = parts[4].trim();
-        }
+        // CSV 格式: char,jyutping,definition,example
+        // 0: word, 1: jyutping, 2: definition, 3: example
+        const definition = parts.length >= 3 ? parts[2].trim() : undefined;
+        const example = parts.length >= 4 ? parts[3].trim() : undefined;
 
         // 只有当拼音不为空时才添加
         if (pinyin) {
-          entries.push({ word, pinyin, weight, definition, example });
+          entries.push({ word, pinyin, weight: 0, definition, example });
         }
       }
     }
