@@ -1,10 +1,10 @@
 {
   "version": 2,
   "name": "cantonese-dictionary",
-  "buildCommand": "pnpm build:web",
+  "buildCommand": "pnpm install && pnpm build:web",
   "outputDirectory": "dist-web",
-  "installCommand": "pnpm install",
   "framework": null,
+  "installCommand": "pnpm install",
   "rewrites": [
     {
       "source": "/(.*)",
@@ -16,6 +16,15 @@
   "headers": [
     {
       "source": "/assets/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
+        }
+      ]
+    },
+    {
+      "source": "/static/(.*)",
       "headers": [
         {
           "key": "Cache-Control",
