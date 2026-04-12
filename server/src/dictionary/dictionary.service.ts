@@ -175,7 +175,20 @@ export class DictionaryService {
 
   // 获取所有声母
   getInitials(): string[] {
-    return this.mockSyllableGroups.map(group => group.initial);
+    // 从数据库获取所有音节
+    const allSyllables = this.db.getAllSyllables();
+
+    // 提取所有声母并去重
+    const initialsSet = new Set<string>();
+    for (const item of allSyllables) {
+      const syllable = item.syllable;
+      // 提取声母（第一个字母）
+      const syllableInitial = syllable.charAt(0);
+      initialsSet.add(syllableInitial);
+    }
+
+    // 转换为数组并排序
+    return Array.from(initialsSet).sort();
   }
 
   // 获取所有音节
