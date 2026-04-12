@@ -83,12 +83,22 @@ export namespace Network {
 
             // 根据路由处理请求
             if (pathname === '/api/dictionary/detail') {
+                console.log('[Network] ========== 处理 detail 请求 ==========');
+                console.log('[Network] option.data:', option.data);
+                console.log('[Network] 查询词:', option.data?.word);
+
                 const detail = await localDictionary.getWordDetail(option.data.word)
+
+                console.log('[Network] getWordDetail 返回:', detail);
+
                 responseData = {
                     code: 200,
                     message: 'success',
                     data: detail
                 }
+
+                console.log('[Network] detail 响应数据:', JSON.stringify(responseData));
+                console.log('[Network] ========== detail 处理完成 ==========');
             } else if (pathname === '/api/dictionary/suggestions') {
                 console.log('[Network] 处理 suggestions 请求，option.data:', option.data);
                 console.log('[Network] query 参数:', option.data?.query);

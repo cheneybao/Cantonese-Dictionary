@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>完整测试流程</title>
+  <style>
+    body {
+      font-family: monospace;
+      padding: 20px;
+      max-width: 800px;
+      margin: 0 auto;
+    }
+    .log {
+      margin-top: 20px;
+      padding: 15px;
+      background-color: #1e1e1e;
+      color: #00ff00;
+      border-radius: 4px;
+      white-space: pre-wrap;
+      word-break: break-all;
+      max-height: 400px;
+      overflow-y: auto;
+      font-size: 12px;
+    }
+    button {
+      padding: 10px 20px;
+      margin: 5px;
+      border: none;
+      border-radius: 5px;
+      background-color: #1890ff;
+      color: white;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <h1>完整测试流程</h1>
+  <button onclick="testFullFlow('你好')">测试"你好"</button>
+  <button onclick="testFullFlow('执笠')">测试"执笠"</button>
+  <button onclick="clearLog()">清除日志</button>
+  <div id="log" class="log"></div>
+
+  <script>
+    const logDiv = document.getElementById('log');
+
+    function log(message) {
+      const time = new Date().toLocaleTimeString();
+      logDiv.textContent += `[${time}] ${message}\n`;
+      logDiv.scrollTop = logDiv.scrollHeight;
+    }
+
+    function clearLog() {
+      logDiv.textContent = '';
+    }
+
+    // IndexedDB 配置
+    const DB_NAME = 'CantoneseDictionaryDB';
+    const DB_VERSION = 1;
+    const STORE_NAME = 'dictionary';
+
+    // 打开数据库
+    async function openDB() {
+      return new Promise((resolve, reject) => {
+        const request = indexedDB.open(DB_NAME, DB_VERSION);
+        request.onsuccess = () => {
+          log('数据库打开成功');
+          resolve(request.result);
+        };
+        request.onerror = () => {
+          log('数据库打开失败: ' + request.error);
+          reject(request.error);
+        };
+        request.onupgradeneeded = (event) => {
+          log('数据库版本升级');
+          const db = event.target.result;
+          if (!db.objectStoreNames.contains(STORE_NAME)) {
+            const store = db.createObjectStore(STORE_NAME, { keyPath: 'w' });
+            store.createIndex('idx_w', 'w', { unique: true });
+            store.createIndex('idx_j', 'j', { unique: false });
+            log('创建对象存储和索引');
+          }
+        };
+      });
+    }
+
+    // 检查数据库状态
+    async function checkDBStatus(db) {
+      const transaction = db.transaction([STORE_NAME], 'readonly');
+      const store = transaction.objectStore(STORE_NAME);
+      const count = await new Promise((resolve, reject) => {
+        const countRequest = store.count();
+        countRequest.onsuccess = () => resolve(countRequest.result);
+        countRequest.onerror = () => reject(countRequest.error);
+      });
+      log(`数据库包含 ${count} 条词条`);
+      return count > 0;
+    }
+
+    // 模拟 getWordDetail
+    async function getWordDetail(db, word) {
+      log(`[getWordDetail] 查询词条: ${word}`);
+
+      const transaction = db.transaction([STORE_NAME], 'readonly');
+      const store = transaction.objectStore(STORE_NAME);
+
+      const request = store.get(word);
+
+      return new Promise((resolve, reject) => {
+        request.onsuccess = () => {
+          const result = request.result;
+          if (result) {
+            log(`[getWordDetail] 找到词条: ${result.w} - ${result.j}`);
+            resolve(result);
+          } else {
+            log(`[getWordDetail] 未找到词条: ${word}`);
+            resolve(null);
+          }
+        };
+        request.onerror = () => {
+          log(`[getWordDetail] 查询失败: ${request.error}`);
+          reject(request.error);
+        };
+      });
+    }
+
+    // 模拟 Network.request
+    async function networkRequest(url, data) {
+      log(`[Network.request] URL: ${url}`);
+      log(`[Network.request] Data: ${JSON.stringify(data)}`);
+
+      const db = await openDB();
+      const hasData = await checkDBStatus(db);
+
+      if (!hasData) {
+        log('[Network.request] 数据库为空，尝试加载数据...');
+        await loadData(db);
+      }
+
+      if (url === '/api/dictionary/detail') {
+        const detail = await getWordDetail(db, data.word);
+        log(`[Network.request] 返回: ${JSON.stringify(detail)}`);
+        return {
+          data: {
+            code: 200,
+            message: 'success',
+            data: detail
+          },
+          statusCode: 200
+        };
+      }
+
+      throw new Error('未知的API路由: ' + url);
+    }
+
+    // 加载数据
+    async function loadData(db) {
+      log('[loadData] 开始加载数据...');
+
+      try {
+        const response = await fetch('/data/dictionary.json');
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+
+        const jsonData = await response.json();
+        log(`[loadData] 数据下载完成，版本: ${jsonData.v}`);
+        log(`[loadData] 词条数: ${jsonData.stats.words}`);
+
+        const transaction = db.transaction([STORE_NAME], 'readwrite');
+        const store = transaction.objectStore(STORE_NAME);
+
+        // 清空旧数据
+        store.clear();
+
+        // 批量插入
+        jsonData.w.forEach((word, index) => {
+          store.put(word);
+          if (index < 5) {
+            log(`[loadData] 导入词 ${index + 1}: ${word.w} - ${word.j}`);
+          }
+        });
+
+        return new Promise((resolve, reject) => {
+          transaction.oncomplete = () => {
+            log(`[loadData] 成功导入 ${jsonData.stats.words} 条词条`);
+            resolve();
+          };
+          transaction.onerror = () => {
+            log(`[loadData] 导入失败: ${transaction.error}`);
+            reject(transaction.error);
+          };
+        });
+      } catch (error) {
+        log(`[loadData] 加载失败: ${error.message}`);
+        throw error;
+      }
+    }
+
+    // 完整测试流程
+    async function testFullFlow(word) {
+      clearLog();
+      log('========== 开始测试流程 ==========');
+      log(`测试词条: ${word}`);
+      log('');
+
+      try {
+        // 1. 模拟前端调用
+        const res = await networkRequest('/api/dictionary/detail', { word });
+
+        log('');
+        log('========== API响应 ==========');
+        log(`状态码: ${res.statusCode}`);
+        log(`响应数据: ${JSON.stringify(res.data)}`);
+
+        if (res.data.code === 200 && res.data.data) {
+          log('');
+          log('========== 测试成功 ==========');
+          log(`词条: ${res.data.data.word}`);
+          log(`粤拼: ${res.data.data.jyutping}`);
+          log(`释义: ${res.data.data.definition}`);
+        } else {
+          log('');
+          log('========== 测试失败 ==========');
+          log('未找到词条');
+        }
+      } catch (error) {
+        log('');
+        log('========== 测试失败 ==========');
+        log(`错误: ${error.message}`);
+      }
+
+      log('');
+      log('========== 测试结束 ==========');
+    }
+  </script>
+</body>
+</html>

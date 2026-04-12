@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>IndexedDB 详情查询测试</title>
+  <style>
+    body {
+      font-family: monospace;
+      padding: 20px;
+      max-width: 800px;
+      margin: 0 auto;
+    }
+    .result {
+      margin-top: 20px;
+      padding: 15px;
+      background-color: #f5f5f5;
+      border-radius: 4px;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+    .error {
+      border-left: 4px solid #ff4d4f;
+      color: #ff4d4f;
+    }
+    .success {
+      border-left: 4px solid #52c41a;
+      color: #52c41a;
+    }
+    button {
+      padding: 10px 20px;
+      margin: 5px;
+      border: none;
+      border-radius: 5px;
+      background-color: #1890ff;
+      color: white;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <h1>IndexedDB 详情查询测试</h1>
+  <button onclick="testDetail('你好')">测试"你好"</button>
+  <button onclick="testDetail('执笠')">测试"执笠"</button>
+  <button onclick="testDetail('你')">测试"你"</button>
+  <button onclick="checkAllData()">检查所有数据</button>
+  <div id="result" class="result"></div>
+
+  <script>
+    const DB_NAME = 'CantoneseDictionaryDB';
+    const DB_VERSION = 1;
+    const STORE_NAME = 'dictionary';
+
+    async function openDB() {
+      return new Promise((resolve, reject) => {
+        const request = indexedDB.open(DB_NAME, DB_VERSION);
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+      });
+    }
+
+    async function getWordDetail(db, word) {
+      return new Promise((resolve, reject) => {
+        const transaction = db.transaction([STORE_NAME], 'readonly');
+        const store = transaction.objectStore(STORE_NAME);
+        const request = store.get(word);
+
+        request.onsuccess = () => {
+          resolve(request.result);
+        };
+        request.onerror = () => reject(request.error);
+      });
+    }
+
+    async function testDetail(word) {
+      const resultDiv = document.getElementById('result');
+      resultDiv.textContent = `正在查询 "${word}"...`;
+
+      try {
+        const db = await openDB();
+        const result = await getWordDetail(db, word);
+
+        if (result) {
+          resultDiv.textContent = `找到词条:\n` +
+            `词条: ${result.w}\n` +
+            `粤拼: ${result.j}\n` +
+            `释义: ${result.d || '无'}\n` +
+            `示例: ${result.e || '无'}`;
+          resultDiv.className = 'result success';
+        } else {
+          resultDiv.textContent = `未找到词条: "${word}"`;
+          resultDiv.className = 'result error';
+        }
+      } catch (error) {
+        resultDiv.textContent = `错误: ${error.message}`;
+        resultDiv.className = 'result error';
+      }
+    }
+
+    async function checkAllData() {
+      const resultDiv = document.getElementById('result');
+      resultDiv.textContent = '正在检查数据库...';
+
+      try {
+        const db = await openDB();
+
+        // 检查数据量
+        const count = await new Promise((resolve, reject) => {
+          const transaction = db.transaction([STORE_NAME], 'readonly');
+          const store = transaction.objectStore(STORE_NAME);
+          const countRequest = store.count();
+          countRequest.onsuccess = () => resolve(countRequest.result);
+          countRequest.onerror = () => reject(countRequest.error);
+        });
+
+        // 检查前10条数据
+        const words = await new Promise((resolve, reject) => {
+          const transaction = db.transaction([STORE_NAME], 'readonly');
+          const store = transaction.objectStore(STORE_NAME);
+          const request = store.openCursor(null, 'next');
+          const results = [];
+
+          request.onsuccess = (event) => {
+            const cursor = event.target.result;
+            if (cursor && results.length < 10) {
+              results.push(cursor.value);
+              cursor.continue();
+            } else {
+              resolve(results);
+            }
+          };
+          request.onerror = () => reject(request.error);
+        });
+
+        resultDiv.textContent = `数据库状态:\n` +
+          `总词条数: ${count}\n` +
+          `前10条数据:\n` +
+          words.map((w, i) => `${i + 1}. ${w.w} - ${w.j}`).join('\n');
+        resultDiv.className = 'result success';
+      } catch (error) {
+        resultDiv.textContent = `错误: ${error.message}`;
+        resultDiv.className = 'result error';
+      }
+    }
+
+    // 页面加载时自动检查数据库
+    window.onload = () => {
+      checkAllData();
+    };
+  </script>
+</body>
+</html>

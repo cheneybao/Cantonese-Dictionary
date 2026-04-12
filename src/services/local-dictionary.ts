@@ -269,6 +269,7 @@ class LocalDictionaryService {
 
   // 获取词条详情
   async getWordDetail(word: string): Promise<WordDetail | null> {
+    console.log('[LocalDictionary] ========== getWordDetail 开始 ==========');
     console.log('[LocalDictionary] 获取词条详情:', word);
 
     if (!this.isReady) {
@@ -277,8 +278,11 @@ class LocalDictionaryService {
     }
 
     if (!this.db) {
+      console.error('[LocalDictionary] 数据库未初始化，db为null');
       throw new Error('数据库未初始化');
     }
+
+    console.log('[LocalDictionary] 数据库已就绪，开始查询...');
 
     return new Promise((resolve, reject) => {
       const transaction = this.db!.transaction([STORE_NAME], 'readonly');
@@ -297,7 +301,9 @@ class LocalDictionaryService {
         let wordEntry = request.result as WordEntry | undefined;
 
         if (wordEntry) {
-          console.log('[LocalDictionary] 直接查询成功:', wordEntry.w);
+          console.log('[LocalDictionary] 直接查询成功:', wordEntry.w, wordEntry.j);
+        } else {
+          console.log('[LocalDictionary] 直接查询未找到');
         }
 
         // 如果直接查询不到，且是简体字，尝试用繁体查询
@@ -308,16 +314,18 @@ class LocalDictionaryService {
             wordEntry = request.result as WordEntry | undefined;
 
             if (!wordEntry) {
-              console.log('[LocalDictionary] 未找到词条');
+              console.log('[LocalDictionary] 繁体查询也未找到词条');
+              console.log('[LocalDictionary] ========== getWordDetail 结束 (null) ==========');
               resolve(null);
               return;
             }
 
-            console.log('[LocalDictionary] 繁体查询成功:', wordEntry.w);
+            console.log('[LocalDictionary] 繁体查询成功:', wordEntry.w, wordEntry.j);
             this.buildWordDetail(wordEntry, resolve);
           };
           request.onerror = () => {
             console.error('[LocalDictionary] 繁体查询失败:', request.error);
+            console.log('[LocalDictionary] ========== getWordDetail 结束 (error) ==========');
             reject(request.error);
           };
           return;
@@ -325,21 +333,26 @@ class LocalDictionaryService {
 
         if (!wordEntry) {
           console.log('[LocalDictionary] 未找到词条');
+          console.log('[LocalDictionary] ========== getWordDetail 结束 (null) ==========');
           resolve(null);
           return;
         }
 
+        console.log('[LocalDictionary] 准备构建词条详情...');
         this.buildWordDetail(wordEntry, resolve);
       };
 
       request.onerror = () => {
         console.error('[LocalDictionary] 查询失败:', request.error);
+        console.log('[LocalDictionary] ========== getWordDetail 结束 (error) ==========');
         reject(request.error);
       };
     });
   }
 
   private buildWordDetail(wordEntry: WordEntry, resolve: (value: WordDetail | null) => void) {
+    console.log('[LocalDictionary] buildWordDetail 开始，词条:', wordEntry.w);
+
     // 获取相关词条（相同首字）
     const related: string[] = [];
     // 简化处理：不查询相关词以提高性能
@@ -354,6 +367,8 @@ class LocalDictionaryService {
       related: related.length > 0 ? related.slice(0, 5) : []
     };
 
+    console.log('[LocalDictionary] buildWordDetail 完成，detail:', detail);
+    console.log('[LocalDictionary] ========== getWordDetail 结束 (success) ==========');
     resolve(detail);
   }
 
