@@ -1,7 +1,14 @@
 {
   "version": 2,
-  "buildCommand": "pnpm build:web",
+  "buildCommand": "pnpm install && pnpm build:web",
   "outputDirectory": "dist-web",
+  "installCommand": "pnpm install",
   "cleanUrls": true,
-  "trailingSlash": false
+  "trailingSlash": false,
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
 }
