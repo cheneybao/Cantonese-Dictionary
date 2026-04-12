@@ -315,6 +315,12 @@ class LocalDictionaryService {
 
             if (!wordEntry) {
               console.log('[LocalDictionary] 繁体查询也未找到词条');
+              // 如果查询的是单字，尝试查找以该字开头的词语
+              if (word.length === 1 || traditionalWord.length === 1) {
+                console.log('[LocalDictionary] 查询单字未找到，尝试查找相关词语');
+                this.findWordsStartingWith(word, resolve);
+                return;
+              }
               console.log('[LocalDictionary] ========== getWordDetail 结束 (null) ==========');
               resolve(null);
               return;
@@ -333,6 +339,12 @@ class LocalDictionaryService {
 
         if (!wordEntry) {
           console.log('[LocalDictionary] 未找到词条');
+          // 如果查询的是单字，尝试查找以该字开头的词语
+          if (word.length === 1) {
+            console.log('[LocalDictionary] 查询单字未找到，尝试查找相关词语');
+            this.findWordsStartingWith(word, resolve);
+            return;
+          }
           console.log('[LocalDictionary] ========== getWordDetail 结束 (null) ==========');
           resolve(null);
           return;
@@ -348,6 +360,71 @@ class LocalDictionaryService {
         reject(request.error);
       };
     });
+  }
+
+  // 查找以指定字开头的词语（用于单字查询）
+  private findWordsStartingWith(word: string, resolve: (value: WordDetail | null) => void) {
+    if (!this.db) {
+      resolve(null);
+      return;
+    }
+
+    const transaction = this.db!.transaction([STORE_NAME], 'readonly');
+    const store = transaction.objectStore(STORE_NAME);
+    const index = store.index('idx_w');
+
+    const range = IDBKeyRange.lowerBound(word);
+    const request = index.openCursor(range);
+    const results: WordEntry[] = [];
+
+    request.onsuccess = (event) => {
+      const cursor = (event.target as IDBRequest).result;
+      if (cursor && results.length < 10) {
+        const wordEntry = cursor.value as WordEntry;
+        if (wordEntry.w.startsWith(word)) {
+          results.push(wordEntry);
+          cursor.continue();
+        } else {
+          // 不再匹配，结束查询
+          this.buildSuggestionDetail(word, results, resolve);
+        }
+      } else {
+        // 已达到限制或查询完成
+        this.buildSuggestionDetail(word, results, resolve);
+      }
+    };
+
+    request.onerror = () => {
+      console.error('[LocalDictionary] 查找相关词语失败:', request.error);
+      resolve(null);
+    };
+  }
+
+  // 构建建议详情（用于单字查询）
+  private buildSuggestionDetail(word: string, relatedWords: WordEntry[], resolve: (value: WordDetail | null) => void) {
+    if (relatedWords.length === 0) {
+      console.log('[LocalDictionary] ========== getWordDetail 结束 (null, 无相关词语) ==========');
+      resolve(null);
+      return;
+    }
+
+    console.log('[LocalDictionary] 找到相关词语:', relatedWords.map(w => w.w).join(', '));
+
+    // 使用第一个词作为主词
+    const mainWord = relatedWords[0];
+    const detail: WordDetail = {
+      id: word,
+      word: word,
+      jyutping: word.length > 0 && mainWord.j.length > 0 ? mainWord.j.split(' ')[0] : '',
+      pronunciation: word.length > 0 && mainWord.j.length > 0 ? [mainWord.j.split(' ')[0]] : [],
+      definition: `该字在词典中无独立词条，以下是包含"${word}"的词语：`,
+      examples: [],
+      related: relatedWords.slice(0, 10).map(w => w.w)
+    };
+
+    console.log('[LocalDictionary] buildSuggestionDetail 完成，detail:', detail);
+    console.log('[LocalDictionary] ========== getWordDetail 结束 (success with suggestions) ==========');
+    resolve(detail);
   }
 
   private buildWordDetail(wordEntry: WordEntry, resolve: (value: WordDetail | null) => void) {
