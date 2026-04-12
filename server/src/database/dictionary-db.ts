@@ -3,7 +3,8 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { s2t } from 'chinese-s2t';
 
-const DB_DIR = path.join(process.cwd(), 'server', 'data');
+// 使用 /tmp 目录作为数据库路径（Vercel 兼容）
+const DB_DIR = process.env.TEMP_DIR || '/tmp';
 const DB_PATH = path.join(DB_DIR, 'dictionary.db');
 
 // 兼容不同的模块导出方式

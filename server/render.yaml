@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: cantonese-dictionary-api
+    env: node
+    region: singapore
+    plan: free
+    buildCommand: pnpm install && pnpm build
+    startCommand: node dist/main
+    envVars:
+      - key: NODE_ENV
+        value: production
+    healthCheckPath: /api
