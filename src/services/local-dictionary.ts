@@ -232,7 +232,7 @@ class LocalDictionaryService {
         searchTerms.push(traditionalQuery);
       }
 
-      console.log('[LocalDictionary] 搜索词列表:', searchTerms);
+      console.log('[LocalDictionary] 搜索词:', query);
 
       request.onsuccess = (event) => {
         const cursor = (event.target as IDBRequest).result;
@@ -240,18 +240,12 @@ class LocalDictionaryService {
         if (cursor && results.length < limit) {
           const word = cursor.value as WordEntry;
 
-          // 调试：打印前10个游标遍历的词
-          if (results.length < 5) {
-            console.log('[LocalDictionary] 游标词:', word.w, word.j, '匹配:', searchTerms.some(term => word.w.includes(term)));
-          }
-
           // 模糊匹配：检查是否匹配任何搜索词
           const matchesWord = searchTerms.some(term => word.w.includes(term));
-          const matchesJyutping = word.j.includes(query.toLowerCase());
+          const matchesJyutping = word.j.toLowerCase().includes(query.toLowerCase());
 
           if (matchesWord || matchesJyutping) {
             results.push(word);
-            console.log('[LocalDictionary] 找到匹配:', word.w, word.j);
           }
 
           cursor.continue();
