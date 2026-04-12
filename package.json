@@ -24,7 +24,7 @@
     "preview:weapp": "taro build --type weapp --preview",
     "tsc": "npx tsc --noEmit --skipLibCheck",
     "validate": "pnpm exec concurrently --kill-others-on-fail --kill-signal SIGKILL -n lint,tsc -c red,blue \"pnpm lint:build\" \"pnpm tsc\"",
-    "vercel-build": "pnpm build:web && mkdir -p dist-web/static/data && cp src/static/data/dictionary.json dist-web/static/data/dictionary.json"
+    "vercel-build": "bash scripts/vercel-build.sh"
   },
   "lint-staged": {
     "src/**/*.{js,jsx,ts,tsx,css}": [
