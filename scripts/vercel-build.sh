@@ -5,7 +5,21 @@
 
 echo "Starting Vercel build..."
 
-# Build H5 version
+# 设置环境变量以绕过 esbuild 版本检查
+export ESBUILD_BINARY_PATH=${ESBUILD_BINARY_PATH:-}
+
+# 安装依赖
+echo "Installing dependencies..."
+pnpm install --frozen-lockfile
+
+if [ $? -ne 0 ]; then
+  echo "Install failed!"
+  exit 1
+fi
+
+echo "Install successful!"
+
+# 构建 H5 版本
 echo "Building H5 version..."
 pnpm build:web
 
