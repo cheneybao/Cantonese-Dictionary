@@ -1,5 +1,7 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, OnModuleInit } from '@nestjs/common';
 import { DictionaryDatabase } from '../database/dictionary-db';
+import * as fs from 'fs';
+import * as path from 'path';
 
 export interface Suggestion {
   word: string;
@@ -32,8 +34,9 @@ export interface SyllableGroup {
 }
 
 @Injectable()
-export class DictionaryService {
+export class DictionaryService implements OnModuleInit {
   private db: DictionaryDatabase;
+  private isDataImported = false;
   private mockSyllableGroups: SyllableGroup[] = [
     {
       initial: 'b',
@@ -64,6 +67,57 @@ export class DictionaryService {
   constructor() {
     // 初始化数据库连接
     this.db = new DictionaryDatabase();
+  }
+
+  async onModuleInit() {
+    // 模块初始化时检查并导入数据
+    await this.ensureDataImported();
+  }
+
+  private async ensureDataImported() {
+    if (this.isDataImported) {
+      return;
+    }
+
+    try {
+      // 检查数据库是否有数据
+      const wordCount = this.db.getWordCount();
+
+      if (wordCount === 0) {
+        console.log('[DictionaryService] 数据库为空，开始导入数据...');
+        await this.importCSVData();
+        this.isDataImported = true;
+      } else {
+        console.log(`[DictionaryService] 数据库已有 ${wordCount} 条数据，跳过导入`);
+        this.isDataImported = true;
+      }
+    } catch (error) {
+      console.error('[DictionaryService] 检查数据导入失败:', error);
+    }
+  }
+
+  private async importCSVData() {
+    const csvPaths = [
+      path.join(process.cwd(), '..', 'data', 'word.csv'),
+      path.join(process.cwd(), 'server', 'data', 'word.csv'),
+      path.join(process.cwd(), 'data', 'word.csv')
+    ];
+
+    for (const csvPath of csvPaths) {
+      if (fs.existsSync(csvPath)) {
+        console.log('[DictionaryService] 找到词库文件:', csvPath);
+        try {
+          this.db.importDictionary(csvPath);
+          console.log('[DictionaryService] 数据导入完成');
+          return;
+        } catch (error) {
+          console.error('[DictionaryService] 导入数据失败:', error);
+        }
+      }
+    }
+
+    console.warn('[DictionaryService] 未找到词库文件，请在以下位置之一放置 word.csv：');
+    csvPaths.forEach(p => console.warn('  -', p));
   }
 
   // 获取联想建议
@@ -106,24 +160,52 @@ export class DictionaryService {
 
   // 获取词条详情
   async getDetail(word: string): Promise<WordDetail | null> {
-    const result = this.db.getWordDetail(word);
+    console.log('[DictionaryService] 查询词条详情，参数:', word);
 
-    if (!result) return null;
+    const result = this.db.getWordDetail(word);
+    console.log('[DictionaryService] 数据库查询结果:', result);
+
+    if (!result) {
+      console.log('[DictionaryService] 未找到词条:', word);
+      return null;
+    }
 
     // 获取相关词条（相同音节的其他词）
     const related = this.db.searchWords(word.substring(0, 1), 5)
       .filter(item => item.word !== word)
       .map(item => item.word);
 
-    return {
+    // 解析例句（如果存在）
+    let examples = [];
+    if (result.example) {
+      try {
+        // 例句格式：中文句子|粤拼|英文翻译（可选）
+        const exampleLines = result.example.split('\n');
+        examples = exampleLines.map(line => {
+          const parts = line.split('|');
+          return {
+            chinese: parts[0] || '',
+            jyutping: parts[1] || '',
+            english: parts[2] || undefined
+          };
+        }).filter(ex => ex.chinese && ex.jyutping);
+      } catch (error) {
+        console.error('解析例句失败:', error);
+      }
+    }
+
+    const wordDetail = {
       id: result.id.toString(),
       word: result.word,
       jyutping: result.pinyin,
       pronunciation: result.pinyin.split(' '),
-      definition: '来自 Rime Cantonese 词典',
-      examples: [],
-      related: related
+      definition: result.definition || '来自 Rime Cantonese 词典',
+      examples,
+      related
     };
+
+    console.log('[DictionaryService] 返回词条详情:', wordDetail);
+    return wordDetail;
   }
 
   // 按声母获取音节

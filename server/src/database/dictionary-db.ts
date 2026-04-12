@@ -116,6 +116,13 @@ export class DictionaryDatabase {
     this.cache.clear();
   }
 
+  // 获取词条总数
+  getWordCount(): number {
+    const stmt = this.db.prepare('SELECT COUNT(*) as count FROM words');
+    const result = stmt.get() as { count: number };
+    return result.count;
+  }
+
   // 验证粤拼音节的有效性
   private isValidCantoneseSyllable(syllable: string): boolean {
     // 粤拼音节格式：字母开头，数字结尾

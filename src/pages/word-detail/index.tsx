@@ -70,40 +70,26 @@ const WordDetailPage = () => {
   const loadWordDetail = async (keyword: string) => {
     try {
       setLoading(true)
+      console.log('正在加载词条详情:', keyword)
+
       const res = await Network.request({
         url: '/api/dictionary/detail',
         method: 'POST',
         data: { word: keyword }
       })
 
-      if (res.data && res.data.code === 200) {
+      console.log('后端响应:', res)
+
+      if (res.data && res.data.code === 200 && res.data.data) {
+        console.log('成功获取词条:', res.data.data)
         setDetail(res.data.data)
 
         // 保存到历史记录
         saveToHistory(res.data.data)
       } else {
-        // 模拟数据
-        const mockDetail: WordDetail = {
-          id: Date.now().toString(),
-          word: keyword,
-          jyutping: 'jyut6 ping3',
-          definition: '粤拼，粤语拼音方案的一种，由香港语言学学会制定。',
-          examples: [
-            {
-              chinese: '粤拼',
-              jyutping: 'jyut6 ping3',
-              english: 'Cantonese Romanization'
-            },
-            {
-              chinese: '粤语',
-              jyutping: 'jyut6 jyu5',
-              english: 'Cantonese'
-            }
-          ],
-          related: ['粤语', '拼音', '声调']
-        }
-        setDetail(mockDetail)
-        saveToHistory(mockDetail)
+        console.log('未找到词条，响应数据:', res.data)
+        // 未找到词条，显示空状态
+        setDetail(null)
       }
     } catch (error) {
       console.error('加载词条详情失败:', error)
@@ -111,6 +97,7 @@ const WordDetailPage = () => {
         title: '加载失败',
         icon: 'none'
       })
+      setDetail(null)
     } finally {
       setLoading(false)
     }
