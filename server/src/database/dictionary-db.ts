@@ -2,30 +2,43 @@ import Database from 'better-sqlite3';
 import * as fs from 'fs';
 import * as path from 'path';
 
-const DB_PATH = path.join(process.cwd(), 'server/data', 'dictionary.db');
+const DB_DIR = path.join(process.cwd(), 'server', 'data');
+const DB_PATH = path.join(DB_DIR, 'dictionary.db');
+
+// 确保数据库目录存在
+if (!fs.existsSync(DB_DIR)) {
+  fs.mkdirSync(DB_DIR, { recursive: true });
+}
 
 export class DictionaryDatabase {
   private db: Database.Database;
+  private cache: Map<string, { data: any, timestamp: number }>;
+  private cacheTimeout: number; // 缓存超时时间（毫秒）
 
-  constructor() {
+  constructor(cacheTimeout: number = 5 * 60 * 1000) {
     this.db = new Database(DB_PATH);
+    this.cacheTimeout = cacheTimeout;
+    this.cache = new Map();
     this.initDatabase();
   }
 
   private initDatabase() {
-    // 创建词条表
+    // 创建词条表（包含释义和例句）
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS words (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         word TEXT NOT NULL,
         pinyin TEXT NOT NULL,
         weight INTEGER DEFAULT 0,
+        definition TEXT,
+        example TEXT,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         UNIQUE(word, pinyin)
       );
 
       CREATE INDEX IF NOT EXISTS idx_words_word ON words(word);
       CREATE INDEX IF NOT EXISTS idx_words_pinyin ON words(pinyin);
+      CREATE INDEX IF NOT EXISTS idx_words_weight ON words(weight DESC);
     `);
 
     // 创建音节表
@@ -54,14 +67,43 @@ export class DictionaryDatabase {
     `);
   }
 
-  // 导入词典数据
+  // 缓存辅助方法
+  private getCacheKey(method: string, params: any): string {
+    return `${method}:${JSON.stringify(params)}`;
+  }
+
+  private getFromCache(key: string): any | null {
+    const cached = this.cache.get(key);
+    if (!cached) return null;
+
+    // 检查是否过期
+    if (Date.now() - cached.timestamp > this.cacheTimeout) {
+      this.cache.delete(key);
+      return null;
+    }
+
+    return cached.data;
+  }
+
+  private setCache(key: string, data: any): void {
+    this.cache.set(key, {
+      data,
+      timestamp: Date.now()
+    });
+  }
+
+  private clearCache(): void {
+    this.cache.clear();
+  }
+
+  // 导入词典数据（支持扩展格式：word pinyin weight definition example）
   importDictionary(filePath: string) {
     const content = fs.readFileSync(filePath, 'utf-8');
     const lines = content.split('\n');
 
     const insertWord = this.db.prepare(`
-      INSERT OR IGNORE INTO words (word, pinyin, weight)
-      VALUES (?, ?, ?)
+      INSERT OR IGNORE INTO words (word, pinyin, weight, definition, example)
+      VALUES (?, ?, ?, ?, ?)
     `);
 
     const insertSyllable = this.db.prepare(`
@@ -82,10 +124,16 @@ export class DictionaryDatabase {
       VALUES (?, ?)
     `);
 
-    const insertMany = this.db.transaction((entries: Array<{word: string, pinyin: string, weight: number}>) => {
+    const insertMany = this.db.transaction((entries: Array<{
+      word: string,
+      pinyin: string,
+      weight: number,
+      definition?: string,
+      example?: string
+    }>) => {
       for (const entry of entries) {
-        // 插入词条
-        insertWord.run(entry.word, entry.pinyin, entry.weight);
+        // 插入词条（包含释义和例句）
+        insertWord.run(entry.word, entry.pinyin, entry.weight, entry.definition || null, entry.example || null);
 
         // 获取词条 ID
         const word = getWordId.get(entry.word, entry.pinyin) as {id: number};
@@ -110,19 +158,41 @@ export class DictionaryDatabase {
     });
 
     // 解析数据并导入
-    const entries: Array<{word: string, pinyin: string, weight: number}> = [];
+    const entries: Array<{
+      word: string,
+      pinyin: string,
+      weight: number,
+      definition?: string,
+      example?: string
+    }> = [];
     for (const line of lines) {
       // 跳过注释和空行
-      if (line.startsWith('#') || line.trim() === '') continue;
+      if (line.startsWith('#') || line.startsWith('---') || line.startsWith('...') || line.trim() === '') continue;
 
-      // 解析行：汉字 拼音 词频
-      const parts = line.trim().split(/\s+/);
+      // 使用制表符分割，保持拼音中的空格
+      const parts = line.trim().split('\t');
+
       if (parts.length >= 2) {
-        const word = parts[0];
-        const pinyin = parts[1];
+        const word = parts[0].trim();
+        const pinyin = parts[1].trim();
         const weight = parts.length >= 3 ? parseInt(parts[2]) || 0 : 0;
 
-        entries.push({ word, pinyin, weight });
+        // 尝试提取释义和例句
+        let definition: string | undefined;
+        let example: string | undefined;
+
+        if (parts.length >= 4) {
+          definition = parts[3].trim();
+        }
+
+        if (parts.length >= 5) {
+          example = parts[4].trim();
+        }
+
+        // 只有当拼音不为空时才添加
+        if (pinyin) {
+          entries.push({ word, pinyin, weight, definition, example });
+        }
       }
     }
 
@@ -133,40 +203,67 @@ export class DictionaryDatabase {
 
   // 搜索词条（支持拼音和汉字）
   searchWords(query: string, limit = 20) {
+    const cacheKey = this.getCacheKey('searchWords', { query, limit });
+    const cached = this.getFromCache(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
     const stmt = this.db.prepare(`
-      SELECT word, pinyin, weight
+      SELECT word, pinyin, weight, definition
       FROM words
       WHERE word LIKE ? OR pinyin LIKE ?
       ORDER BY weight DESC
       LIMIT ?
     `);
 
-    return stmt.all(`%${query}%`, `%${query}%`, limit) as Array<{
+    const result = stmt.all(`%${query}%`, `%${query}%`, limit) as Array<{
       word: string;
       pinyin: string;
       weight: number;
+      definition: string | null;
     }>;
+
+    this.setCache(cacheKey, result);
+    return result;
   }
 
-  // 获取词条详情
+  // 获取词条详情（包含释义和例句）
   getWordDetail(word: string) {
+    const cacheKey = this.getCacheKey('getWordDetail', { word });
+    const cached = this.getFromCache(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
     const stmt = this.db.prepare(`
       SELECT * FROM words WHERE word = ?
       ORDER BY weight DESC
       LIMIT 1
     `);
 
-    return stmt.get(word) as {
+    const result = stmt.get(word) as {
       id: number;
       word: string;
       pinyin: string;
       weight: number;
+      definition: string | null;
+      example: string | null;
       created_at: string;
     } | undefined;
+
+    this.setCache(cacheKey, result);
+    return result;
   }
 
   // 按音节检索
   searchBySyllable(syllable: string) {
+    const cacheKey = this.getCacheKey('searchBySyllable', { syllable });
+    const cached = this.getFromCache(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
     const stmt = this.db.prepare(`
       SELECT DISTINCT w.word, w.pinyin, w.weight
       FROM words w
@@ -177,15 +274,24 @@ export class DictionaryDatabase {
       LIMIT 50
     `);
 
-    return stmt.all(syllable) as Array<{
+    const result = stmt.all(syllable) as Array<{
       word: string;
       pinyin: string;
       weight: number;
     }>;
+
+    this.setCache(cacheKey, result);
+    return result;
   }
 
   // 获取所有音节
   getAllSyllables() {
+    const cacheKey = this.getCacheKey('getAllSyllables', {});
+    const cached = this.getFromCache(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
     const stmt = this.db.prepare(`
       SELECT syllable, COUNT(*) as count
       FROM syllables
@@ -194,10 +300,13 @@ export class DictionaryDatabase {
       ORDER BY syllable
     `);
 
-    return stmt.all() as Array<{
+    const result = stmt.all() as Array<{
       syllable: string;
       count: number;
     }>;
+
+    this.setCache(cacheKey, result);
+    return result;
   }
 
   close() {

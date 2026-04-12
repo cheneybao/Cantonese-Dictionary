@@ -1,13 +1,20 @@
 import { useState, useEffect } from 'react'
 import { View, Text, ScrollView } from '@tarojs/components'
 import Taro, { useRouter } from '@tarojs/taro'
-import { Volume2, Star, Share2, BookOpen, Heart, VolumeX } from 'lucide-react-taro'
+import { Volume2, Star, Share2, BookOpen, Heart, VolumeX, TriangleAlert } from 'lucide-react-taro'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import { SpeakingAnimation } from '@/components/ui/speaking-animation'
 import { Network } from '@/network'
-import { speakCantonese, isSpeechSupported, isCantoneseVoiceAvailable } from '@/utils/speech'
+import {
+  speakCantonese,
+  speakCantoneseSlow,
+  isSpeechSupported,
+  isCantoneseVoiceAvailable,
+  detectVoiceSupport
+} from '@/utils/speech'
 import './index.css'
 
 type WordDetail = {
@@ -35,8 +42,10 @@ const WordDetailPage = () => {
   const [isFavorite, setIsFavorite] = useState(false)
   const [loading, setLoading] = useState(true)
   const [isSpeaking, setIsSpeaking] = useState(false)
+  const [isSlowMode, setIsSlowMode] = useState(false)
   const [speechSupported, setSpeechSupported] = useState(false)
   const [cantoneseAvailable, setCantoneseAvailable] = useState(false)
+  const [voiceDetection, setVoiceDetection] = useState<ReturnType<typeof detectVoiceSupport> | null>(null)
 
   useEffect(() => {
     const { word: wordParam, jyutping } = router.params
@@ -49,8 +58,13 @@ const WordDetailPage = () => {
     checkFavorite(wordParam || jyutping)
 
     // 检查语音支持
-    setSpeechSupported(isSpeechSupported())
-    setCantoneseAvailable(isCantoneseVoiceAvailable())
+    const supported = isSpeechSupported()
+    setSpeechSupported(supported)
+
+    if (supported) {
+      setCantoneseAvailable(isCantoneseVoiceAvailable())
+      setVoiceDetection(detectVoiceSupport())
+    }
   }, [router.params])
 
   const loadWordDetail = async (keyword: string) => {
@@ -218,23 +232,20 @@ const WordDetailPage = () => {
       return
     }
 
-    if (!cantoneseAvailable) {
-      Taro.showToast({
-        title: '暂无粤语语音包',
-        icon: 'none',
-        duration: 2000
-      })
-      return
-    }
-
     setIsSpeaking(true)
 
     try {
-      const success = await speakCantonese(detail.word, {
-        rate: 0.9,
-        pitch: 1,
-        volume: 1
-      })
+      const success = isSlowMode
+        ? await speakCantoneseSlow(detail.word, {
+            rate: 0.7,
+            pitch: 1,
+            volume: 1
+          })
+        : await speakCantonese(detail.word, {
+            rate: 0.9,
+            pitch: 1,
+            volume: 1
+          })
 
       if (!success) {
         Taro.showToast({
@@ -253,6 +264,15 @@ const WordDetailPage = () => {
     } finally {
       setIsSpeaking(false)
     }
+  }
+
+  const toggleSlowMode = () => {
+    setIsSlowMode(!isSlowMode)
+    Taro.showToast({
+      title: isSlowMode ? '已关闭慢速模式' : '已开启慢速模式',
+      icon: 'none',
+      duration: 1500
+    })
   }
 
   const shareWord = () => {
@@ -294,6 +314,26 @@ const WordDetailPage = () => {
   return (
     <View className="word-detail-page min-h-screen bg-gray-50 pb-20">
       <ScrollView scrollY>
+        {/* 语音包检测提示 */}
+        {speechSupported && voiceDetection && !cantoneseAvailable && (
+          <Alert className="mx-4 mt-4 bg-yellow-50 border-yellow-200">
+            <TriangleAlert size={16} color="#f59e0b" />
+            <AlertDescription className="text-sm text-yellow-800 ml-2">
+              <Text className="block font-medium mb-1">{voiceDetection.recommendation}</Text>
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {/* 发音动画 */}
+        {isSpeaking && (
+          <View className="px-4 mt-4">
+            <SpeakingAnimation
+              isSpeaking={isSpeaking}
+              text={isSlowMode ? '慢速播放中...' : '播放中...'}
+            />
+          </View>
+        )}
+
         {/* 词条头部 */}
         <View className="bg-white p-6 shadow-sm">
           <View className="flex items-center justify-between mb-4">
@@ -306,19 +346,32 @@ const WordDetailPage = () => {
               </Badge>
             </View>
             <View className="flex items-center gap-2">
-              {speechSupported && cantoneseAvailable ? (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={playAudio}
-                  disabled={isSpeaking}
-                >
-                  {isSpeaking ? (
-                    <VolumeX size={24} color="#f59e0b" />
-                  ) : (
-                    <Volume2 size={24} color="#1890ff" />
-                  )}
-                </Button>
+              {speechSupported ? (
+                <>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={playAudio}
+                    disabled={isSpeaking}
+                    className={isSlowMode ? 'bg-yellow-50' : ''}
+                  >
+                    {isSpeaking ? (
+                      <VolumeX size={24} color="#f59e0b" />
+                    ) : (
+                      <Volume2 size={24} color={isSlowMode ? "#f59e0b" : "#1890ff"} />
+                    )}
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={toggleSlowMode}
+                    className={isSlowMode ? 'bg-yellow-50' : ''}
+                  >
+                    <Text className="block text-xs" style={{ color: isSlowMode ? '#f59e0b' : '#9ca3af' }}>
+                      {isSlowMode ? '慢速' : '正常'}
+                    </Text>
+                  </Button>
+                </>
               ) : (
                 <View className="opacity-40">
                   <Volume2 size={24} color="#9ca3af" />
