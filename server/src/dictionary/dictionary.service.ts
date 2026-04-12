@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { DictionaryDatabase } from '../database/dictionary-db';
 
 export interface Suggestion {
   word: string;
@@ -32,132 +33,7 @@ export interface SyllableGroup {
 
 @Injectable()
 export class DictionaryService {
-  // 模拟数据 - 实际应该从数据库或文件中读取
-  private mockDictionary: WordDetail[] = [
-    {
-      id: '1',
-      word: '粤拼',
-      jyutping: 'jyut6 ping3',
-      definition: '粤拼，粤语拼音方案的一种，由香港语言学学会制定。',
-      examples: [
-        {
-          chinese: '粤拼',
-          jyutping: 'jyut6 ping3',
-          english: 'Cantonese Romanization'
-        },
-        {
-          chinese: '粤语',
-          jyutping: 'jyut6 jyu5',
-          english: 'Cantonese'
-        }
-      ],
-      related: ['粤语', '拼音', '声调']
-    },
-    {
-      id: '2',
-      word: '粤语',
-      jyutping: 'jyut6 jyu5',
-      definition: '粤语，又称广东话、广府话、白话，是一种声调语言，属汉藏语系汉语族。',
-      examples: [
-        {
-          chinese: '我会说粤语',
-          jyutping: 'ngo5 wui5 sek3 jyut6 jyu5',
-          english: 'I can speak Cantonese'
-        }
-      ],
-      related: ['粤拼', '普通话', '客家话']
-    },
-    {
-      id: '3',
-      word: '你好',
-      jyutping: 'nei5 hou2',
-      definition: '问候语，相当于普通话的"你好"。',
-      examples: [
-        {
-          chinese: '你好',
-          jyutping: 'nei5 hou2',
-          english: 'Hello'
-        },
-        {
-          chinese: '你好吗？',
-          jyutping: 'nei5 hou2 maa1?',
-          english: 'How are you?'
-        }
-      ],
-      related: ['早晨', '拜拜', '多谢']
-    },
-    {
-      id: '4',
-      word: '早晨',
-      jyutping: 'zou2 san4',
-      definition: '早上好，早安的粤语说法。',
-      examples: [
-        {
-          chinese: '早晨！',
-          jyutping: 'zou2 san4!',
-          english: 'Good morning!'
-        }
-      ],
-      related: ['你好', '晚安', '你好吗']
-    },
-    {
-      id: '5',
-      word: '多谢',
-      jyutping: 'do1 ze6',
-      definition: '谢谢的粤语说法。',
-      examples: [
-        {
-          chinese: '多谢你',
-          jyutping: 'do1 ze6 nei5',
-          english: 'Thank you'
-        }
-      ],
-      related: ['唔该', '拜拜', '你好']
-    },
-    {
-      id: '6',
-      word: '唔该',
-      jyutping: 'm4 goi1',
-      definition: '粤语常用语，可以表示谢谢或麻烦你。',
-      examples: [
-        {
-          chinese: '唔该晒',
-          jyutping: 'm4 goi1 saai3',
-          english: 'Thank you very much'
-        }
-      ],
-      related: ['多谢', '麻烦', '唔该晒']
-    },
-    {
-      id: '7',
-      word: '食饭',
-      jyutping: 'sik6 faan6',
-      definition: '吃饭，用餐。',
-      examples: [
-        {
-          chinese: '我哋去食饭',
-          jyutping: 'ngo5 dei6 heoi3 sik6 faan6',
-          english: 'Let\'s go eat'
-        }
-      ],
-      related: ['饮水', '午餐', '晚餐']
-    },
-    {
-      id: '8',
-      word: '饮水',
-      jyutping: 'jam2 seoi2',
-      definition: '喝水。',
-      examples: [
-        {
-          chinese: '饮啲水',
-          jyutping: 'jam2 di1 seoi2',
-          english: 'Drink some water'
-        }
-      ],
-      related: ['食饭', '咖啡', '茶']
-    }
-  ];
-
+  private db: DictionaryDatabase;
   private mockSyllableGroups: SyllableGroup[] = [
     {
       initial: 'b',
@@ -185,23 +61,26 @@ export class DictionaryService {
     }
   ];
 
+  constructor() {
+    // 初始化数据库连接
+    this.db = new DictionaryDatabase();
+  }
+
   // 获取联想建议
   async getSuggestions(query: string): Promise<Suggestion[]> {
-    const suggestions: Suggestion[] = [];
-    const lowerQuery = query.toLowerCase();
+    if (!query) return [];
 
-    // 搜索汉字匹配
-    for (const item of this.mockDictionary) {
-      if (item.word.includes(query)) {
-        suggestions.push({
-          word: item.word,
-          jyutping: item.jyutping,
-          type: 'word'
-        });
-      }
-    }
+    // 从数据库搜索词条
+    const words = this.db.searchWords(query, 10);
+
+    const suggestions: Suggestion[] = words.map(item => ({
+      word: item.word,
+      jyutping: item.pinyin,
+      type: 'word' as const
+    }));
 
     // 搜索粤拼音节匹配
+    const lowerQuery = query.toLowerCase();
     for (const group of this.mockSyllableGroups) {
       for (const syllable of group.syllables) {
         const toneless = syllable.replace(/\d+$/, '');
@@ -227,7 +106,24 @@ export class DictionaryService {
 
   // 获取词条详情
   async getDetail(word: string): Promise<WordDetail | null> {
-    return this.mockDictionary.find(item => item.word === word) || null;
+    const result = this.db.getWordDetail(word);
+
+    if (!result) return null;
+
+    // 获取相关词条（相同音节的其他词）
+    const related = this.db.searchWords(word.substring(0, 1), 5)
+      .filter(item => item.word !== word)
+      .map(item => item.word);
+
+    return {
+      id: result.id.toString(),
+      word: result.word,
+      jyutping: result.pinyin,
+      pronunciation: result.pinyin.split(' '),
+      definition: '来自 Rime Cantonese 词典',
+      examples: [],
+      related: related
+    };
   }
 
   // 按声母获取音节
@@ -237,16 +133,25 @@ export class DictionaryService {
 
   // 按粤拼音节查找词语
   async getByJyutping(jyutping: string): Promise<WordDetail[]> {
-    const tonelessJyutping = jyutping.replace(/\d+$/, '');
-    return this.mockDictionary.filter(item => {
-      const itemToneless = item.jyutping.replace(/\d+$/, '');
-      return itemToneless === tonelessJyutping || item.jyutping === jyutping;
-    });
+    const words = this.db.searchBySyllable(jyutping);
+
+    return words.map(item => ({
+      id: Math.random().toString(),
+      word: item.word,
+      jyutping: item.pinyin,
+      pronunciation: item.pinyin.split(' '),
+      definition: '来自 Rime Cantonese 词典'
+    }));
   }
 
   // 获取所有声母
   getInitials(): string[] {
     return this.mockSyllableGroups.map(group => group.initial);
+  }
+
+  // 获取所有音节
+  getAllSyllables(): Array<{syllable: string, count: number}> {
+    return this.db.getAllSyllables();
   }
 
   // 获取无声调音节列表
@@ -257,5 +162,9 @@ export class DictionaryService {
       tonelessSet.add(toneless);
     });
     return Array.from(tonelessSet).sort();
+  }
+
+  onModuleDestroy() {
+    this.db.close();
   }
 }

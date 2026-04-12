@@ -119,4 +119,50 @@ export class DictionaryController {
       data: initials
     };
   }
+
+  /**
+   * 导入词典数据
+   * POST /api/dictionary/import
+   */
+  @Post('import')
+  async importData() {
+    try {
+      // 数据已在服务初始化时导入
+      return {
+        code: 200,
+        message: 'import success',
+        data: {
+          syllables: this.dictionaryService.getAllSyllables().length
+        }
+      };
+    } catch (error) {
+      return {
+        code: 500,
+        message: 'import failed',
+        data: null
+      };
+    }
+  }
+
+  /**
+   * 获取所有音节
+   * GET /api/dictionary/syllables-all
+   */
+  @Get('syllables-all')
+  async getAllSyllables() {
+    try {
+      const syllables = this.dictionaryService.getAllSyllables();
+      return {
+        code: 200,
+        message: 'success',
+        data: syllables
+      };
+    } catch (error) {
+      return {
+        code: 500,
+        message: 'failed to get syllables',
+        data: []
+      };
+    }
+  }
 }

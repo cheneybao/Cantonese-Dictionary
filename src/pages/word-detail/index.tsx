@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react'
 import { View, Text, ScrollView } from '@tarojs/components'
 import Taro, { useRouter } from '@tarojs/taro'
-import { Volume2, Star, Share2, BookOpen, Heart } from 'lucide-react-taro'
+import { Volume2, Star, Share2, BookOpen, Heart, VolumeX } from 'lucide-react-taro'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Network } from '@/network'
+import { speakCantonese, isSpeechSupported, isCantoneseVoiceAvailable } from '@/utils/speech'
 import './index.css'
 
 type WordDetail = {
@@ -33,6 +34,9 @@ const WordDetailPage = () => {
   const [detail, setDetail] = useState<WordDetail | null>(null)
   const [isFavorite, setIsFavorite] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [isSpeaking, setIsSpeaking] = useState(false)
+  const [speechSupported, setSpeechSupported] = useState(false)
+  const [cantoneseAvailable, setCantoneseAvailable] = useState(false)
 
   useEffect(() => {
     const { word: wordParam, jyutping } = router.params
@@ -43,6 +47,10 @@ const WordDetailPage = () => {
     }
 
     checkFavorite(wordParam || jyutping)
+
+    // 检查语音支持
+    setSpeechSupported(isSpeechSupported())
+    setCantoneseAvailable(isCantoneseVoiceAvailable())
   }, [router.params])
 
   const loadWordDetail = async (keyword: string) => {
@@ -198,17 +206,53 @@ const WordDetailPage = () => {
     }
   }
 
-  const playAudio = () => {
+  const playAudio = async () => {
     if (!detail) return
 
-    // 调用抖音小程序的 TTS API
-    Taro.showToast({
-      title: '播放读音',
-      icon: 'none'
-    })
+    if (!speechSupported) {
+      Taro.showToast({
+        title: '您的浏览器不支持语音功能',
+        icon: 'none',
+        duration: 2000
+      })
+      return
+    }
 
-    // 实际应该调用 TTS API
-    // 抖音小程序使用 tt.createInnerAudioContext()
+    if (!cantoneseAvailable) {
+      Taro.showToast({
+        title: '暂无粤语语音包',
+        icon: 'none',
+        duration: 2000
+      })
+      return
+    }
+
+    setIsSpeaking(true)
+
+    try {
+      const success = await speakCantonese(detail.word, {
+        rate: 0.9,
+        pitch: 1,
+        volume: 1
+      })
+
+      if (!success) {
+        Taro.showToast({
+          title: '播放失败',
+          icon: 'none',
+          duration: 2000
+        })
+      }
+    } catch (error) {
+      console.error('发音失败:', error)
+      Taro.showToast({
+        title: '播放失败',
+        icon: 'none',
+        duration: 2000
+      })
+    } finally {
+      setIsSpeaking(false)
+    }
   }
 
   const shareWord = () => {
@@ -262,13 +306,24 @@ const WordDetailPage = () => {
               </Badge>
             </View>
             <View className="flex items-center gap-2">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={playAudio}
-              >
-                <Volume2 size={24} color="#1890ff" />
-              </Button>
+              {speechSupported && cantoneseAvailable ? (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={playAudio}
+                  disabled={isSpeaking}
+                >
+                  {isSpeaking ? (
+                    <VolumeX size={24} color="#f59e0b" />
+                  ) : (
+                    <Volume2 size={24} color="#1890ff" />
+                  )}
+                </Button>
+              ) : (
+                <View className="opacity-40">
+                  <Volume2 size={24} color="#9ca3af" />
+                </View>
+              )}
               <Button
                 variant="ghost"
                 size="sm"

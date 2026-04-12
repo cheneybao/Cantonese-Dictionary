@@ -1,0 +1,89 @@
+# 示例粤语词典数据
+# 格式：汉字 拼音 词频
+
+# 常用单字
+你好 nei5 hou2 100
+我 ngo5 200
+你 nei5 150
+佢 keoi5 120
+係 hai6 180
+唔 m4 160
+有 jau5 140
+無 mou5 110
+去 heoi3 100
+來 lai4 95
+
+# 日常用语
+早晨 zau2 san4 90
+晚安 maan5 on1 85
+多謝 do1 ze6 80
+唔該 m4 goi1 85
+對唔住 deoi3 m4 zyu6 70
+唔緊要 m4 gan2 jiu3 60
+
+# 食物
+飯 faan6 75
+粥 zuk1 65
+麵 min6 60
+飯 fan6 55
+茶 caa4 50
+水 seoi2 45
+
+# 颜色
+紅 hung4 40
+白 baak6 35
+黑 hak1 38
+藍 laam4 32
+黃 wong4 30
+綠 luk6 28
+
+# 数字
+一 jat1 100
+二 ji6 95
+三 saam1 90
+四 sei3 85
+五 ng5 80
+六 luk6 75
+七 cat1 70
+八 baat3 65
+九 gau2 60
+十 sap6 55
+
+# 动词
+食 sik6 85
+飲 jam2 80
+行 haang4 75
+坐 co5 70
+瞌 gaau3 65
+企 kei5 60
+講 gong2 58
+聽 teng1 56
+
+# 方位
+上 soeng6 45
+下 haa6 42
+左 zo2 40
+右 jau6 38
+前 cin4 35
+后 hau6 33
+
+# 时间
+今日 gam1 jat6 70
+明天 ting1 jat6 65
+昨日 zok3 jat6 60
+而家 ji4 gaa1 55
+以後 ji5 hau6 50
+之前 zi4 cin4 45
+
+# 成语
+恭喜發財 gung1 hei2 faat3 coi4 40
+身體健康 san1 tai2 kin6 hong1 35
+一路順意 jat1 lou6 seon6 ji3 30
+恭喜恭喜 gung1 hei2 gung1 hei2 25
+
+# 地点
+屋心 uk1 keoi2 20
+學校 hok6 haau6 18
+公園 gung1 jyun2 16
+街 gai1 14
+店 dim3 12

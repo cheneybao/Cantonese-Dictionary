@@ -139,12 +139,12 @@ const IndexPage = () => {
   return (
     <View className="index-page min-h-screen bg-gray-50 pb-16">
       {/* 搜索区域 */}
-      <View className="bg-white p-4 shadow-sm">
+      <View className="bg-white p-4 sm:p-6 shadow-sm">
         <View className="flex items-center gap-3">
-          <View className="flex-1 flex items-center bg-gray-100 rounded-xl px-3 py-2">
-            <Search size={20} color="#666666" />
+          <View className="flex-1 flex items-center bg-gray-100 rounded-xl px-3 py-2 sm:py-3">
+            <Search size={20} color="#666666" className="flex-shrink-0" />
             <Input
-              className="flex-1 bg-transparent ml-2"
+              className="flex-1 bg-transparent ml-2 text-base"
               placeholder="输入汉字、词语或粤拼"
               value={searchText}
               onInput={(e) => setSearchText(e.detail.value)}
@@ -156,16 +156,18 @@ const IndexPage = () => {
                 size={20}
                 color="#999999"
                 onClick={handleClearSearch}
+                className="flex-shrink-0"
               />
             )}
           </View>
           <Button
-            className="bg-blue-500 text-white rounded-xl px-4 py-2 flex-shrink-0"
+            className="bg-blue-500 text-white rounded-xl px-3 sm:px-4 py-2 sm:py-3 flex-shrink-0"
             onClick={startVoiceInput}
           >
             <Mic
               size={24}
               color={isRecording ? '#ef4444' : '#ffffff'}
+              className="sm:size-28"
             />
           </Button>
         </View>
@@ -205,7 +207,7 @@ const IndexPage = () => {
 
       {/* 最近查词 */}
       {recentWords.length > 0 && (
-        <View className="mt-4 px-4">
+        <View className="mt-4 px-4 sm:px-6">
           <View className="flex items-center justify-between mb-3">
             <Text className="block text-sm font-semibold text-gray-900">
               最近查词
@@ -219,27 +221,27 @@ const IndexPage = () => {
             </Button>
           </View>
 
-          <View className="space-y-3">
+          <View className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {recentWords.map((item, index) => (
               <Card
                 key={index}
-                className="bg-white rounded-xl shadow-sm cursor-pointer"
+                className="bg-white rounded-xl shadow-sm cursor-pointer hover:shadow-md transition-shadow"
                 onClick={() => goToDetail(item.word)}
               >
                 <CardContent className="p-4">
                   <View className="flex items-center justify-between">
-                    <View className="flex items-center gap-3">
-                      <Text className="block text-lg font-medium text-gray-900">
+                    <View className="flex items-center gap-2 sm:gap-3">
+                      <Text className="block text-base sm:text-lg font-medium text-gray-900">
                         {item.word}
                       </Text>
-                      <Badge className="font-mono text-blue-600">
+                      <Badge className="font-mono text-blue-600 text-xs sm:text-sm">
                         {item.jyutping}
                       </Badge>
                     </View>
-                    <Volume2 size={20} color="#1890ff" />
+                    <Volume2 size={20} color="#1890ff" className="flex-shrink-0" />
                   </View>
                   {item.definition && (
-                    <Text className="block text-sm text-gray-600 mt-2">
+                    <Text className="block text-xs sm:text-sm text-gray-600 mt-2 line-clamp-2">
                       {item.definition}
                     </Text>
                   )}
@@ -252,12 +254,12 @@ const IndexPage = () => {
 
       {/* 空状态提示 */}
       {!searchText && recentWords.length === 0 && (
-        <View className="flex flex-col items-center justify-center py-20 px-4">
+        <View className="flex flex-col items-center justify-center py-16 sm:py-20 px-4">
           <BookOpen size={64} color="#d1d5db" />
-          <Text className="block text-lg font-medium text-gray-600 mt-4 mb-2">
+          <Text className="block text-base sm:text-lg font-medium text-gray-600 mt-4 mb-2">
             开始学习粤语
           </Text>
-          <Text className="block text-sm text-gray-400 text-center">
+          <Text className="block text-xs sm:text-sm text-gray-400 text-center">
             输入汉字、词语或粤拼音节{'\n'}即可查询读音和释义
           </Text>
         </View>
