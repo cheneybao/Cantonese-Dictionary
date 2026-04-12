@@ -1,6 +1,7 @@
 {
   "version": 2,
+  "buildCommand": "pnpm build:web",
+  "outputDirectory": "dist-web",
   "cleanUrls": true,
-  "trailingSlash": false,
-  "buildCommand": "bash scripts/build-vercel.sh"
+  "trailingSlash": false
 }
