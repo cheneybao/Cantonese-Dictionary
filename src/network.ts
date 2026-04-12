@@ -14,7 +14,10 @@ import { localDictionary } from '@/services/local-dictionary'
  */
 
 // 环境配置
-const USE_LOCAL_API = (import.meta as any).env?.VITE_USE_LOCAL_API !== 'false'; // 默认使用本地 API
+// VITE_USE_LOCAL_API=false 时使用远程后端，否则使用 IndexedDB 本地数据
+// 默认使用本地 API（生产环境无需后端）
+const USE_LOCAL_API = String((import.meta as any).env?.VITE_USE_LOCAL_API || 'true') !== 'false';
+console.log('[Network] USE_LOCAL_API:', USE_LOCAL_API, 'VITE_USE_LOCAL_API:', (import.meta as any).env?.VITE_USE_LOCAL_API);
 
 export namespace Network {
     const createUrl = (url: string): string => {
