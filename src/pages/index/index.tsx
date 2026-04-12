@@ -95,6 +95,16 @@ const IndexPage = () => {
   }
 
   const startVoiceInput = () => {
+    // 平台检测：RecorderManager 仅在小程序中可用
+    if (Taro.getEnv() !== Taro.ENV_TYPE.WEAPP) {
+      Taro.showToast({
+        title: '语音输入仅在小程序中可用',
+        icon: 'none',
+        duration: 2000
+      })
+      return
+    }
+
     if (isRecording) {
       stopVoiceInput()
       return
@@ -102,10 +112,25 @@ const IndexPage = () => {
 
     setIsRecording(true)
 
-    // 调用系统语音识别
-    Taro.getRecorderManager().start({
-      format: 'mp3'
-    })
+    try {
+      // 调用系统语音识别
+      const recorderManager = Taro.getRecorderManager()
+      if (recorderManager && typeof recorderManager.start === 'function') {
+        recorderManager.start({
+          format: 'mp3'
+        })
+      } else {
+        console.error('RecorderManager 不可用')
+        setIsRecording(false)
+      }
+    } catch (error) {
+      console.error('启动录音失败:', error)
+      setIsRecording(false)
+      Taro.showToast({
+        title: '录音功能不可用',
+        icon: 'none'
+      })
+    }
 
     // 模拟录音结束（实际应该使用语音识别API）
     setTimeout(() => {
@@ -116,8 +141,20 @@ const IndexPage = () => {
   const stopVoiceInput = () => {
     setIsRecording(false)
 
+    // 平台检测：RecorderManager 仅在小程序中可用
+    if (Taro.getEnv() === Taro.ENV_TYPE.WEAPP) {
+      try {
+        const recorderManager = Taro.getRecorderManager()
+        if (recorderManager && typeof recorderManager.stop === 'function') {
+          recorderManager.stop()
+        }
+      } catch (error) {
+        console.error('停止录音失败:', error)
+      }
+    }
+
     // 这里应该调用语音识别API
-    // 抖音小程序可以使用 tt.getVoiceRecognizerManager()
+    // 小程序可以使用相关语音识别API
     Taro.showToast({
       title: '语音识别功能开发中',
       icon: 'none'
