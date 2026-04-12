@@ -394,6 +394,19 @@ const WordDetailPage = () => {
             </View>
           </View>
 
+          {/* 无释义提示 */}
+          {!detail.definition && (!detail.examples || detail.examples.length === 0) && (
+            <Alert className="mt-4 bg-blue-50 border-blue-200">
+              <BookOpen size={16} color="#3b82f6" />
+              <AlertDescription className="text-sm text-blue-700 ml-2">
+                <Text className="block">
+                  该词条仅有发音数据，未收录释义和例句。{'\n'}
+                  语音数据来源：Rime Cantonese（jyut6ping3）词典
+                </Text>
+              </AlertDescription>
+            </Alert>
+          )}
+
           {/* 多音字提示 */}
           {detail.tones && detail.tones.length > 1 && (
             <Alert className="mt-4 bg-blue-50 border-blue-200">
@@ -493,11 +506,32 @@ const WordDetailPage = () => {
 
         {/* 底部提示 */}
         <View className="mt-8 mb-6 px-4">
-          <View className="flex items-center justify-center gap-2 text-gray-400">
-            <Heart size={16} color="#9ca3af" />
-            <Text className="block text-xs">
-              数据来源：Rime Cantonese, CC-Canto
+          <View className="bg-gray-50 rounded-lg p-4">
+            <Text className="block text-sm text-gray-600 font-semibold mb-2">
+              数据来源
             </Text>
+            <View className="flex items-center gap-2 mb-1">
+              <Heart size={14} color="#ef4444" />
+              <Text className="block text-xs text-gray-500">
+                语音数据：Rime Cantonese（jyut6ping3）词典 - 92,717 条词条
+              </Text>
+            </View>
+            {detail.definition && (
+              <View className="flex items-center gap-2">
+                <Heart size={14} color="#ef4444" />
+                <Text className="block text-xs text-gray-500">
+                  释义数据：CC-Canto 词典
+                </Text>
+              </View>
+            )}
+            {!detail.definition && (
+              <View className="flex items-center gap-2">
+                <Heart size={14} color="#9ca3af" />
+                <Text className="block text-xs text-gray-400 italic">
+                  释义数据：未收录
+                </Text>
+              </View>
+            )}
           </View>
         </View>
       </ScrollView>
