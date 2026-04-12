@@ -1,6 +1,7 @@
 const Database = require('better-sqlite3');
 import * as fs from 'fs';
 import * as path from 'path';
+import { s2t } from 'chinese-s2t';
 
 const DB_DIR = path.join(process.cwd(), 'server', 'data');
 const DB_PATH = path.join(DB_DIR, 'dictionary.db');
@@ -244,7 +245,7 @@ export class DictionaryDatabase {
     console.log(`导入完成：${entries.length} 条词条`);
   }
 
-  // 搜索词条（支持拼音和汉字）
+  // 搜索词条（支持拼音和汉字，支持简繁体）
   searchWords(query: string, limit = 20) {
     const cacheKey = this.getCacheKey('searchWords', { query, limit });
     const cached = this.getFromCache(cacheKey);
@@ -260,12 +261,35 @@ export class DictionaryDatabase {
       LIMIT ?
     `);
 
-    const result = stmt.all(`%${query}%`, `%${query}%`, limit) as Array<{
+    // 先尝试直接查询
+    let result = stmt.all(`%${query}%`, `%${query}%`, limit) as Array<{
       word: string;
       pinyin: string;
       weight: number;
       definition: string | null;
     }>;
+
+    // 如果结果不足且查询包含汉字，尝试简繁转换后查询
+    if (result.length < limit && /[\u4e00-\u9fff]/.test(query)) {
+      const traditional = s2t(query);
+      if (traditional !== query) {
+        const additionalResult = stmt.all(`%${traditional}%`, `%${traditional}%`, limit - result.length) as Array<{
+          word: string;
+          pinyin: string;
+          weight: number;
+          definition: string | null;
+        }>;
+
+        // 合并结果，去重
+        const seen = new Set(result.map(item => item.word));
+        for (const item of additionalResult) {
+          if (!seen.has(item.word) && result.length < limit) {
+            result.push(item);
+            seen.add(item.word);
+          }
+        }
+      }
+    }
 
     this.setCache(cacheKey, result);
     return result;
@@ -285,7 +309,8 @@ export class DictionaryDatabase {
       LIMIT 1
     `);
 
-    const result = stmt.get(word) as {
+    // 先尝试直接查询
+    let result = stmt.get(word) as {
       id: number;
       word: string;
       pinyin: string;
@@ -294,6 +319,22 @@ export class DictionaryDatabase {
       example: string | null;
       created_at: string;
     } | undefined;
+
+    // 如果没有找到，尝试将简体转换为繁体再查询
+    if (!result) {
+      const traditional = s2t(word);
+      if (traditional !== word) {
+        result = stmt.get(traditional) as {
+          id: number;
+          word: string;
+          pinyin: string;
+          weight: number;
+          definition: string | null;
+          example: string | null;
+          created_at: string;
+        } | undefined;
+      }
+    }
 
     this.setCache(cacheKey, result);
     return result;
