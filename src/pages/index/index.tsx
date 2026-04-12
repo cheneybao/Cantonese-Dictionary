@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { View, Text, ScrollView } from '@tarojs/components'
-import { Search, Mic, Circle, Volume2, BookOpen } from 'lucide-react-taro'
+import { Search, Mic, X, Volume2, BookOpen } from 'lucide-react-taro'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -189,7 +189,7 @@ const IndexPage = () => {
               focus
             />
             {searchText && (
-              <Circle
+              <X
                 size={20}
                 color="#999999"
                 onClick={handleClearSearch}
