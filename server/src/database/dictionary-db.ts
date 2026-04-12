@@ -72,6 +72,19 @@ export class DictionaryDatabase {
       CREATE INDEX IF NOT EXISTS idx_syllable_words_syllable ON syllable_words(syllable_id);
       CREATE INDEX IF NOT EXISTS idx_syllable_words_word ON syllable_words(word_id);
     `);
+
+    // 创建普通话-粤语同义词映射表
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS synonyms (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        mandarin TEXT NOT NULL,
+        cantonese TEXT NOT NULL,
+        UNIQUE(mandarin, cantonese)
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_synonyms_mandarin ON synonyms(mandarin);
+      CREATE INDEX IF NOT EXISTS idx_synonyms_cantonese ON synonyms(cantonese);
+    `);
   }
 
   // 缓存辅助方法
@@ -245,7 +258,7 @@ export class DictionaryDatabase {
     console.log(`导入完成：${entries.length} 条词条`);
   }
 
-  // 搜索词条（支持拼音和汉字，支持简繁体）
+  // 搜索词条（支持拼音和汉字，支持简繁体和同义词）
   searchWords(query: string, limit = 20) {
     const cacheKey = this.getCacheKey('searchWords', { query, limit });
     const cached = this.getFromCache(cacheKey);
@@ -268,6 +281,28 @@ export class DictionaryDatabase {
       weight: number;
       definition: string | null;
     }>;
+
+    // 如果结果不足且查询包含汉字，尝试同义词映射（普通话 → 粤语）
+    if (result.length < limit && /[\u4e00-\u9fff]/.test(query)) {
+      const cantoneseSynonym = this.getCantoneseSynonym(query);
+      if (cantoneseSynonym && cantoneseSynonym !== query) {
+        const additionalResult = stmt.all(`%${cantoneseSynonym}%`, `%${cantoneseSynonym}%`, limit - result.length) as Array<{
+          word: string;
+          pinyin: string;
+          weight: number;
+          definition: string | null;
+        }>;
+
+        // 合并结果，去重
+        const seen = new Set(result.map(item => item.word));
+        for (const item of additionalResult) {
+          if (!seen.has(item.word) && result.length < limit) {
+            result.push(item);
+            seen.add(item.word);
+          }
+        }
+      }
+    }
 
     // 如果结果不足且查询包含汉字，尝试简繁转换后查询
     if (result.length < limit && /[\u4e00-\u9fff]/.test(query)) {
@@ -319,6 +354,22 @@ export class DictionaryDatabase {
       example: string | null;
       created_at: string;
     } | undefined;
+
+    // 如果没有找到，尝试从同义词表查找（普通话 → 粤语）
+    if (!result) {
+      const cantoneseSynonym = this.getCantoneseSynonym(word);
+      if (cantoneseSynonym) {
+        result = stmt.get(cantoneseSynonym) as {
+          id: number;
+          word: string;
+          pinyin: string;
+          weight: number;
+          definition: string | null;
+          example: string | null;
+          created_at: string;
+        } | undefined;
+      }
+    }
 
     // 如果没有找到，尝试将简体转换为繁体再查询
     if (!result) {
@@ -391,6 +442,54 @@ export class DictionaryDatabase {
 
     this.setCache(cacheKey, result);
     return result;
+  }
+
+  // 导入普通话-粤语同义词映射
+  importSynonyms(filePath: string) {
+    const content = fs.readFileSync(filePath, 'utf-8');
+    const lines = content.split('\n');
+
+    const insertSynonym = this.db.prepare(`
+      INSERT OR IGNORE INTO synonyms (mandarin, cantonese)
+      VALUES (?, ?)
+    `);
+
+    const insertMany = this.db.transaction((entries: Array<{ mandarin: string, cantonese: string }>) => {
+      for (const entry of entries) {
+        insertSynonym.run(entry.mandarin, entry.cantonese);
+      }
+    });
+
+    const entries: Array<{ mandarin: string, cantonese: string }> = [];
+
+    for (const line of lines) {
+      // 跳过注释和空行
+      if (line.startsWith('#') || line.trim() === '') continue;
+
+      // 按空白字符分割
+      const parts = line.trim().split(/\s+/);
+
+      if (parts.length >= 2) {
+        const mandarin = parts[0];
+        const cantonese = parts[1];
+
+        entries.push({ mandarin, cantonese });
+      }
+    }
+
+    insertMany(entries);
+    console.log(`同义词映射导入完成：${entries.length} 条映射`);
+  }
+
+  // 根据普通话词查找对应的粤语词
+  getCantoneseSynonym(mandarin: string): string | null {
+    const stmt = this.db.prepare(`
+      SELECT cantonese FROM synonyms WHERE mandarin = ?
+      LIMIT 1
+    `);
+
+    const result = stmt.get(mandarin) as { cantonese: string } | undefined;
+    return result?.cantonese || null;
   }
 
   close() {
