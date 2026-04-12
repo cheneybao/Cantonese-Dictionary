@@ -1,9 +1,15 @@
-import Database from 'better-sqlite3';
+const Database = require('better-sqlite3');
 import * as fs from 'fs';
 import * as path from 'path';
 
 const DB_DIR = path.join(process.cwd(), 'server', 'data');
 const DB_PATH = path.join(DB_DIR, 'dictionary.db');
+
+// 兼容不同的模块导出方式
+const SQLite = Database.default || Database;
+
+// 定义类型
+type DatabaseType = any;
 
 // 确保数据库目录存在
 if (!fs.existsSync(DB_DIR)) {
@@ -11,12 +17,12 @@ if (!fs.existsSync(DB_DIR)) {
 }
 
 export class DictionaryDatabase {
-  private db: Database.Database;
+  private db: DatabaseType;
   private cache: Map<string, { data: any, timestamp: number }>;
   private cacheTimeout: number; // 缓存超时时间（毫秒）
 
   constructor(cacheTimeout: number = 5 * 60 * 1000) {
-    this.db = new Database(DB_PATH);
+    this.db = new SQLite(DB_PATH);
     this.cacheTimeout = cacheTimeout;
     this.cache = new Map();
     this.initDatabase();
@@ -96,6 +102,43 @@ export class DictionaryDatabase {
     this.cache.clear();
   }
 
+  // 验证粤拼音节的有效性
+  private isValidCantoneseSyllable(syllable: string): boolean {
+    // 粤拼音节格式：字母开头，数字结尾
+    // 例如：baa1, heoi2, ngau5, nei5, hou2
+    // 排除一些明显的非拼音内容
+    const invalidPatterns = /^(version|name|sort|by_weight|import|vocabulary|cantonese|extended|\d+\.\d+\.\d+)$/i;
+    const invalidChars = /["(),]/;
+    const tooLong = syllable.length > 20; // 音节不应该太长
+
+    // 空字符串无效
+    if (!syllable || syllable.trim() === '') {
+      return false;
+    }
+
+    // 包含无效字符
+    if (invalidChars.test(syllable)) {
+      return false;
+    }
+
+    // 太长
+    if (tooLong) {
+      return false;
+    }
+
+    // 匹配无效模式
+    if (invalidPatterns.test(syllable)) {
+      return false;
+    }
+
+    // 必须以字母开头和数字结尾
+    const startsWithLetter = /^[a-z]/.test(syllable);
+    const endsWithDigit = /\d$/.test(syllable);
+    const hasInvalidChars = /[^a-z\d]/.test(syllable); // 只允许字母和数字
+
+    return startsWithLetter && endsWithDigit && !hasInvalidChars;
+  }
+
   // 导入词典数据（支持扩展格式：word pinyin weight definition example）
   importDictionary(filePath: string) {
     const content = fs.readFileSync(filePath, 'utf-8');
@@ -142,7 +185,7 @@ export class DictionaryDatabase {
         // 提取音节（按空格分割）
         const syllables = entry.pinyin.split(' ');
         for (const syl of syllables) {
-          if (syl) {
+          if (syl && this.isValidCantoneseSyllable(syl)) {
             // 插入音节
             insertSyllable.run(syl);
 

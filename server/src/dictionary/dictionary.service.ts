@@ -128,7 +128,36 @@ export class DictionaryService {
 
   // 按声母获取音节
   async getSyllablesByInitial(initial: string): Promise<SyllableGroup[]> {
-    return this.mockSyllableGroups.filter(group => group.initial === initial);
+    // 从数据库获取所有音节
+    const allSyllables = this.db.getAllSyllables();
+
+    // 按声母分组
+    const syllableMap: Record<string, string[]> = {};
+
+    for (const item of allSyllables) {
+      const syllable = item.syllable;
+
+      // 提取声母（第一个字母）
+      const syllableInitial = syllable.charAt(0);
+
+      if (!syllableMap[syllableInitial]) {
+        syllableMap[syllableInitial] = [];
+      }
+
+      syllableMap[syllableInitial].push(syllable);
+    }
+
+    // 转换为 SyllableGroup 数组
+    const result: SyllableGroup[] = [];
+    for (const [key, syllables] of Object.entries(syllableMap)) {
+      result.push({
+        initial: key,
+        syllables: syllables.sort()
+      });
+    }
+
+    // 只返回匹配的声母
+    return result.filter(group => group.initial === initial);
   }
 
   // 按粤拼音节查找词语
