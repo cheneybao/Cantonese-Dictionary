@@ -4,11 +4,5 @@
   "outputDirectory": "dist-web",
   "installCommand": "pnpm install --ignore-scripts",
   "cleanUrls": true,
-  "trailingSlash": false,
-  "rewrites": [
-    {
-      "source": "/(.*)",
-      "destination": "/index.html"
-    }
-  ]
+  "trailingSlash": false
 }
