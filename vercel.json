@@ -1,8 +1,8 @@
 {
   "version": 2,
-  "buildCommand": "pnpm install && pnpm build:web",
+  "buildCommand": "pnpm install --ignore-scripts && pnpm build:web",
   "outputDirectory": "dist-web",
-  "installCommand": "pnpm install",
+  "installCommand": "pnpm install --ignore-scripts",
   "cleanUrls": true,
   "trailingSlash": false,
   "rewrites": [
