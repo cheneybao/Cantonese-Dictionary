@@ -7,6 +7,16 @@ node-compile-cache/
 dist/
 build/
 dist-*/
+dist-tt/
+dist-web/
+
+# Build cache
+.swc/
+.tsbuildinfo
+
+# Database files
+*.db
+server/server/data/
 
 # Misc
 .DS_Store
