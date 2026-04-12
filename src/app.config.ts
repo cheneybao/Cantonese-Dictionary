@@ -6,7 +6,8 @@ export default defineAppConfig({
     'pages/favorites/index',
     'pages/profile/index',
     'pages/word-detail/index',
-    'pages/test/index'
+    'pages/test/index',
+    'pages/debug/index'
   ],
   window: {
     backgroundTextStyle: 'light',
