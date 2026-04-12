@@ -8,6 +8,9 @@ dist
 build
 dist-*
 
+# Server directory (NestJS backend - not needed for H5 deployment)
+server
+
 # Test coverage
 coverage
 
