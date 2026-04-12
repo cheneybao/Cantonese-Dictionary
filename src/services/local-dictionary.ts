@@ -91,6 +91,10 @@ class LocalDictionaryService {
 
         console.log('[LocalDictionary] 数据库升级完成');
       };
+
+      request.onblocked = () => {
+        console.warn('[LocalDictionary] 数据库被阻塞，请关闭其他标签页');
+      };
     });
   }
 
@@ -147,7 +151,10 @@ class LocalDictionaryService {
 
   // 搜索词条
   async searchWords(query: string, limit = 20): Promise<WordEntry[]> {
+    console.log('[LocalDictionary] 开始搜索:', query);
+
     if (!this.isReady) {
+      console.log('[LocalDictionary] 数据库未就绪，正在初始化...');
       await this.init();
     }
 
@@ -170,6 +177,8 @@ class LocalDictionaryService {
         searchTerms.push(traditionalQuery);
       }
 
+      console.log('[LocalDictionary] 搜索词列表:', searchTerms);
+
       request.onsuccess = (event) => {
         const cursor = (event.target as IDBRequest).result;
 
@@ -182,10 +191,12 @@ class LocalDictionaryService {
 
           if (matchesWord || matchesJyutping) {
             results.push(word);
+            console.log('[LocalDictionary] 找到匹配:', word.w, word.j);
           }
 
           cursor.continue();
         } else {
+          console.log('[LocalDictionary] 搜索完成，找到', results.length, '条结果');
           resolve(results);
         }
       };
@@ -198,7 +209,10 @@ class LocalDictionaryService {
 
   // 获取词条详情
   async getWordDetail(word: string): Promise<WordDetail | null> {
+    console.log('[LocalDictionary] 获取词条详情:', word);
+
     if (!this.isReady) {
+      console.log('[LocalDictionary] 数据库未就绪，正在初始化...');
       await this.init();
     }
 
@@ -217,29 +231,40 @@ class LocalDictionaryService {
       const traditionalWord = s2t(word);
       const tryTraditional = word !== traditionalWord;
 
+      console.log('[LocalDictionary] 繁体转换:', word, '->', traditionalWord, tryTraditional);
+
       request.onsuccess = () => {
         let wordEntry = request.result as WordEntry | undefined;
 
+        if (wordEntry) {
+          console.log('[LocalDictionary] 直接查询成功:', wordEntry.w);
+        }
+
         // 如果直接查询不到，且是简体字，尝试用繁体查询
         if (!wordEntry && tryTraditional) {
+          console.log('[LocalDictionary] 尝试用繁体查询:', traditionalWord);
           request = store.get(traditionalWord);
           request.onsuccess = () => {
             wordEntry = request.result as WordEntry | undefined;
 
             if (!wordEntry) {
+              console.log('[LocalDictionary] 未找到词条');
               resolve(null);
               return;
             }
 
+            console.log('[LocalDictionary] 繁体查询成功:', wordEntry.w);
             this.buildWordDetail(wordEntry, resolve);
           };
           request.onerror = () => {
+            console.error('[LocalDictionary] 繁体查询失败:', request.error);
             reject(request.error);
           };
           return;
         }
 
         if (!wordEntry) {
+          console.log('[LocalDictionary] 未找到词条');
           resolve(null);
           return;
         }
@@ -248,6 +273,7 @@ class LocalDictionaryService {
       };
 
       request.onerror = () => {
+        console.error('[LocalDictionary] 查询失败:', request.error);
         reject(request.error);
       };
     });

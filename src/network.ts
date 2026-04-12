@@ -26,7 +26,20 @@ export namespace Network {
 
     // 本地 API 路由处理
     const isLocalApiRoute = (url: string): boolean => {
-        return USE_LOCAL_API && url.startsWith('/api/dictionary')
+        // 检查是否是相对路径的词典 API
+        if (USE_LOCAL_API && url.startsWith('/api/dictionary')) {
+            return true
+        }
+        // 检查是否是完整 URL 的词典 API（用于处理已经被转换后的 URL）
+        if (USE_LOCAL_API) {
+            try {
+                const urlObj = new URL(url)
+                return urlObj.pathname.startsWith('/api/dictionary')
+            } catch {
+                return false
+            }
+        }
+        return false
     }
 
     // 处理本地词典 API 请求
@@ -34,6 +47,17 @@ export namespace Network {
         const url = option.url
 
         console.log('[Network] 使用本地 IndexedDB API:', url)
+
+        // 从完整 URL 中提取路径
+        let pathname = url
+        try {
+            const urlObj = new URL(url)
+            pathname = urlObj.pathname
+        } catch {
+            // 如果不是完整 URL，直接使用
+        }
+
+        console.log('[Network] 提取路径:', pathname)
 
         try {
             // 确保本地数据已加载
@@ -47,21 +71,21 @@ export namespace Network {
             let responseData: any
 
             // 根据路由处理请求
-            if (url === '/api/dictionary/detail') {
+            if (pathname === '/api/dictionary/detail') {
                 const detail = await localDictionary.getWordDetail(option.data.word)
                 responseData = {
                     code: 200,
                     message: 'success',
                     data: detail
                 }
-            } else if (url === '/api/dictionary/suggestions') {
+            } else if (pathname === '/api/dictionary/suggestions') {
                 const suggestions = await localDictionary.getSuggestions(option.data.query)
                 responseData = {
                     code: 200,
                     message: 'success',
                     data: suggestions
                 }
-            } else if (url === '/api/dictionary/by-jyutping') {
+            } else if (pathname === '/api/dictionary/by-jyutping') {
                 const words = await localDictionary.searchWords(option.data.jyutping, 20)
                 responseData = {
                     code: 200,
@@ -74,7 +98,7 @@ export namespace Network {
                         definition: w.d || '来自 Rime Cantonese 词典'
                     }))
                 }
-            } else if (url === '/api/dictionary/import') {
+            } else if (pathname === '/api/dictionary/import') {
                 const stats = await localDictionary.getStats()
                 responseData = {
                     code: 200,

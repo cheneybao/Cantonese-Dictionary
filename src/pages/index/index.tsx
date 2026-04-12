@@ -29,6 +29,7 @@ const IndexPage = () => {
   const [isRecording, setIsRecording] = useState(false)
   const [showSuggestions, setShowSuggestions] = useState(false)
   const [recentWords, setRecentWords] = useState<SearchResult[]>([])
+  const [isLoading, setIsLoading] = useState(false)
 
   // 从本地存储加载最近查词
   useEffect(() => {
@@ -62,11 +63,16 @@ const IndexPage = () => {
 
   const searchSuggestions = async (query: string) => {
     try {
+      setIsLoading(true)
+      console.log('[IndexPage] 开始搜索联想:', query)
+
       const res = await Network.request({
         url: '/api/dictionary/suggestions',
         method: 'POST',
         data: { query }
       })
+
+      console.log('[IndexPage] 搜索联想响应:', res.data)
 
       if (res.data && res.data.code === 200) {
         setSuggestions(res.data.data || [])
@@ -74,6 +80,9 @@ const IndexPage = () => {
       }
     } catch (error) {
       console.error('搜索联想失败:', error)
+      setSuggestions([])
+    } finally {
+      setIsLoading(false)
     }
   }
 
@@ -210,34 +219,47 @@ const IndexPage = () => {
         </View>
 
         {/* 联想列表 */}
-        {showSuggestions && suggestions.length > 0 && (
+        {showSuggestions && (
           <View className="mt-2 bg-white rounded-xl border border-gray-200 shadow-sm">
-            <ScrollView scrollY className="max-h-60">
-              {suggestions.map((item, index) => (
-                <View
-                  key={index}
-                  className="flex items-center justify-between p-3 border-b border-gray-100 last:border-0"
-                  onClick={() => handleSuggestionClick(item)}
-                >
-                  <View className="flex items-center gap-3">
-                    <Text className="block text-lg font-medium text-gray-900">
-                      {item.word}
-                    </Text>
-                    <Badge
-                      variant="secondary"
-                      className="font-mono text-blue-600"
-                    >
-                      {item.jyutping}
-                    </Badge>
-                  </View>
-                  {item.type === 'syllable' && (
-                    <Badge variant="outline" className="text-xs">
-                      粤拼
-                    </Badge>
-                  )}
+            {isLoading ? (
+              <View className="flex items-center justify-center p-6">
+                <View className="flex items-center gap-2">
+                  <View className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+                  <Text className="block text-sm text-gray-500">搜索中...</Text>
                 </View>
-              ))}
-            </ScrollView>
+              </View>
+            ) : suggestions.length > 0 ? (
+              <ScrollView scrollY className="max-h-60">
+                {suggestions.map((item, index) => (
+                  <View
+                    key={index}
+                    className="flex items-center justify-between p-3 border-b border-gray-100 last:border-0"
+                    onClick={() => handleSuggestionClick(item)}
+                  >
+                    <View className="flex items-center gap-3">
+                      <Text className="block text-lg font-medium text-gray-900">
+                        {item.word}
+                      </Text>
+                      <Badge
+                        variant="secondary"
+                        className="font-mono text-blue-600"
+                      >
+                        {item.jyutping}
+                      </Badge>
+                    </View>
+                    {item.type === 'syllable' && (
+                      <Badge variant="outline" className="text-xs">
+                        粤拼
+                      </Badge>
+                    )}
+                  </View>
+                ))}
+              </ScrollView>
+            ) : (
+              <View className="flex items-center justify-center p-6">
+                <Text className="block text-sm text-gray-500">未找到相关词条</Text>
+              </View>
+            )}
           </View>
         )}
       </View>
