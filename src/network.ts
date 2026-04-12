@@ -26,19 +26,26 @@ export namespace Network {
 
     // 本地 API 路由处理
     const isLocalApiRoute = (url: string): boolean => {
+        console.log('[Network] isLocalApiRoute 检查 URL:', url, 'USE_LOCAL_API:', USE_LOCAL_API);
+
         // 检查是否是相对路径的词典 API
         if (USE_LOCAL_API && url.startsWith('/api/dictionary')) {
+            console.log('[Network] 匹配相对路径 API');
             return true
         }
         // 检查是否是完整 URL 的词典 API（用于处理已经被转换后的 URL）
         if (USE_LOCAL_API) {
             try {
                 const urlObj = new URL(url)
-                return urlObj.pathname.startsWith('/api/dictionary')
+                const isMatch = urlObj.pathname.startsWith('/api/dictionary')
+                console.log('[Network] 完整 URL pathname:', urlObj.pathname, '匹配:', isMatch);
+                return isMatch
             } catch {
+                console.log('[Network] URL 解析失败');
                 return false
             }
         }
+        console.log('[Network] 不匹配本地 API');
         return false
     }
 
@@ -60,11 +67,15 @@ export namespace Network {
         console.log('[Network] 提取路径:', pathname)
 
         try {
-            // 确保本地数据已加载
+            // 检查是否需要加载数据
             const isLoaded = await localDictionary.isDataLoaded()
 
             if (!isLoaded) {
                 console.log('[Network] 本地数据未加载，开始从网络下载...')
+                await localDictionary.loadFromNetwork()
+            } else {
+                // 数据已加载，检查是否需要更新
+                console.log('[Network] 检查数据更新...')
                 await localDictionary.loadFromNetwork()
             }
 
@@ -79,12 +90,17 @@ export namespace Network {
                     data: detail
                 }
             } else if (pathname === '/api/dictionary/suggestions') {
+                console.log('[Network] 处理 suggestions 请求，option.data:', option.data);
+                console.log('[Network] query 参数:', option.data?.query);
+
                 const suggestions = await localDictionary.getSuggestions(option.data.query)
                 responseData = {
                     code: 200,
                     message: 'success',
                     data: suggestions
                 }
+
+                console.log('[Network] suggestions 响应数据:', JSON.stringify(responseData).substring(0, 200));
             } else if (pathname === '/api/dictionary/by-jyutping') {
                 const words = await localDictionary.searchWords(option.data.jyutping, 20)
                 responseData = {
@@ -139,10 +155,13 @@ export namespace Network {
     }
 
     export const request: typeof Taro.request = (option: any) => {
+        console.log('[Network] request 被调用，option:', { url: option.url, method: option.method, data: option.data });
+
         const url = createUrl(option.url)
 
         // 检查是否是本地 API 路由
         if (isLocalApiRoute(option.url)) {
+            console.log('[Network] 识别为本地 API 路由');
             return handleLocalApiRequest({
                 ...option,
                 url

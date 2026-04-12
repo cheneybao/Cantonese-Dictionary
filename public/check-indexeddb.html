@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>IndexedDB 数据检查</title>
+  <style>
+    body {
+      font-family: monospace;
+      padding: 20px;
+      max-width: 800px;
+      margin: 0 auto;
+    }
+    .result {
+      margin-top: 20px;
+      padding: 15px;
+      background-color: #f5f5f5;
+      border-radius: 4px;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+    .error {
+      border-left: 4px solid #ff4d4f;
+    }
+    .success {
+      border-left: 4px solid #52c41a;
+    }
+    button {
+      padding: 10px 20px;
+      margin: 5px;
+      border: none;
+      border-radius: 5px;
+      background-color: #1890ff;
+      color: white;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <h1>IndexedDB 数据检查</h1>
+  <button onclick="checkDatabase()">检查数据库</button>
+  <button onclick="checkWord('你好')">检查"你好"</button>
+  <button onclick="checkWord('执笠')">检查"执笠"</button>
+  <button onclick="checkWord('你')">检查"你"</button>
+  <div id="result" class="result"></div>
+
+  <script>
+    const DB_NAME = 'cantonese-dictionary';
+    const DB_VERSION = 1;
+
+    async function openDB() {
+      return new Promise((resolve, reject) => {
+        const request = indexedDB.open(DB_NAME, DB_VERSION);
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+      });
+    }
+
+    async function countWords(db) {
+      return new Promise((resolve, reject) => {
+        const transaction = db.transaction(['words'], 'readonly');
+        const store = transaction.objectStore('words');
+        const count = store.count();
+        count.onsuccess = () => resolve(count.result);
+        count.onerror = () => reject(count.error);
+      });
+    }
+
+    async function searchWord(db, query) {
+      return new Promise((resolve, reject) => {
+        const transaction = db.transaction(['words'], 'readonly');
+        const store = transaction.objectStore('words');
+        const index = store.index('idx_w');
+        const range = IDBKeyRange.lowerBound(query);
+        const results = [];
+        const request = index.openCursor(range);
+
+        request.onsuccess = (event) => {
+          const cursor = event.target.result;
+          if (cursor && results.length < 10) {
+            const word = cursor.value.w;
+            if (word.startsWith(query)) {
+              results.push(cursor.value);
+              cursor.continue();
+            } else {
+              resolve(results);
+            }
+          } else {
+            resolve(results);
+          }
+        };
+        request.onerror = () => reject(request.error);
+      });
+    }
+
+    async function checkDatabase() {
+      const resultDiv = document.getElementById('result');
+      resultDiv.textContent = '正在检查数据库...';
+
+      try {
+        const db = await openDB();
+        const count = await countWords(db);
+        resultDiv.textContent = `数据库包含 ${count} 条词条`;
+        resultDiv.className = 'result success';
+      } catch (error) {
+        resultDiv.textContent = `错误: ${error.message}`;
+        resultDiv.className = 'result error';
+      }
+    }
+
+    async function checkWord(query) {
+      const resultDiv = document.getElementById('result');
+      resultDiv.textContent = `正在搜索 "${query}"...`;
+
+      try {
+        const db = await openDB();
+        const results = await searchWord(db, query);
+
+        if (results.length > 0) {
+          resultDiv.textContent = `找到 ${results.length} 条匹配:\n` +
+            results.map(item => `${item.w} - ${item.j}`).join('\n');
+          resultDiv.className = 'result success';
+        } else {
+          resultDiv.textContent = `未找到 "${query}" 的匹配词条`;
+          resultDiv.className = 'result error';
+        }
+      } catch (error) {
+        resultDiv.textContent = `错误: ${error.message}`;
+        resultDiv.className = 'result error';
+      }
+    }
+
+    // 页面加载时自动检查数据库
+    window.onload = () => {
+      checkDatabase();
+    };
+  </script>
+</body>
+</html>

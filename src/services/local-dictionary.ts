@@ -116,6 +116,11 @@ class LocalDictionaryService {
       // 批量插入
       jsonData.w.forEach((word) => {
         store.put(word);
+
+        // 调试：打印前10个词
+        if (jsonData.w.indexOf(word) < 10) {
+          console.log('[LocalDictionary] 导入词:', word.w, word.j);
+        }
       });
 
       transaction.oncomplete = () => {
@@ -131,9 +136,10 @@ class LocalDictionaryService {
   }
 
   // 从网络加载 JSON 数据
-  async loadFromNetwork(): Promise<void> {
+  async loadFromNetwork(forceReload = false): Promise<void> {
     try {
       console.log('[LocalDictionary] 从网络加载数据...');
+
       const response = await fetch('/data/dictionary.json');
 
       if (!response.ok) {
@@ -141,14 +147,61 @@ class LocalDictionaryService {
       }
 
       const jsonData: DictionaryData = await response.json();
-      console.log('[LocalDictionary] 数据下载完成，导入 IndexedDB...');
 
+      // 检查版本
+      const localVersion = localStorage.getItem('dictionary_version');
+
+      if (localVersion === jsonData.v && !forceReload) {
+        console.log('[LocalDictionary] 版本相同，跳过加载');
+        return;
+      }
+
+      console.log('[LocalDictionary] 版本:', localVersion, '->', jsonData.v, forceReload ? '(强制)' : '');
+
+      // 如果有旧数据，先清除
+      if (localVersion) {
+        console.log('[LocalDictionary] 清除旧数据');
+        await this.clearAllData();
+      }
+
+      console.log('[LocalDictionary] 数据下载完成，导入 IndexedDB...');
       await this.loadDataFromJson(jsonData);
+
+      // 保存版本号
+      localStorage.setItem('dictionary_version', jsonData.v);
+
       console.log('[LocalDictionary] 数据导入完成');
     } catch (error) {
       console.error('[LocalDictionary] 从网络加载数据失败:', error);
       throw error;
     }
+  }
+
+  // 清除所有数据（用于版本更新或手动刷新）
+  async clearAllData(): Promise<void> {
+    console.log('[LocalDictionary] 清除所有数据...');
+
+    if (!this.db) {
+      await this.init();
+    }
+
+    return new Promise((resolve, reject) => {
+      const transaction = this.db!.transaction([STORE_NAME], 'readwrite');
+      const store = transaction.objectStore(STORE_NAME);
+
+      store.clear();
+
+      transaction.oncomplete = () => {
+        console.log('[LocalDictionary] 数据清除完成');
+        localStorage.removeItem('dictionary_version');
+        resolve();
+      };
+
+      transaction.onerror = () => {
+        console.error('[LocalDictionary] 数据清除失败:', transaction.error);
+        reject(transaction.error);
+      };
+    });
   }
 
   // 搜索词条
@@ -186,6 +239,11 @@ class LocalDictionaryService {
 
         if (cursor && results.length < limit) {
           const word = cursor.value as WordEntry;
+
+          // 调试：打印前10个游标遍历的词
+          if (results.length < 5) {
+            console.log('[LocalDictionary] 游标词:', word.w, word.j, '匹配:', searchTerms.some(term => word.w.includes(term)));
+          }
 
           // 模糊匹配：检查是否匹配任何搜索词
           const matchesWord = searchTerms.some(term => word.w.includes(term));
@@ -301,11 +359,25 @@ class LocalDictionaryService {
 
   // 获取联想建议
   async getSuggestions(query: string): Promise<Array<{ word: string; jyutping: string; type: 'word' | 'syllable' }>> {
+    console.log('[LocalDictionary] getSuggestions 被调用，query:', JSON.stringify(query));
+
+    if (!query || query.trim().length === 0) {
+      console.log('[LocalDictionary] query 为空，返回空数组');
+      return [];
+    }
+
     if (!this.isReady) {
+      console.log('[LocalDictionary] 数据库未就绪，正在初始化...');
       await this.init();
     }
 
-    const words = await this.searchWords(query, 10);
+    const trimmedQuery = query.trim();
+    console.log('[LocalDictionary] 搜索词:', trimmedQuery);
+
+    const words = await this.searchWords(trimmedQuery, 10);
+
+    console.log('[LocalDictionary] getSuggestions 搜索结果:', words.length, '条');
+    console.log('[LocalDictionary] 前3条结果:', words.slice(0, 3));
 
     return words.map(word => ({
       word: word.w,
