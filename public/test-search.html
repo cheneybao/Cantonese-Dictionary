@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>搜索测试</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      padding: 20px;
+      max-width: 800px;
+      margin: 0 auto;
+    }
+    .test-section {
+      margin: 20px 0;
+      padding: 15px;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+    }
+    .test-section h2 {
+      margin-top: 0;
+      color: #333;
+    }
+    button {
+      padding: 10px 20px;
+      margin: 5px;
+      border: none;
+      border-radius: 5px;
+      background-color: #1890ff;
+      color: white;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #096dd9;
+    }
+    .result {
+      margin-top: 10px;
+      padding: 10px;
+      background-color: #f5f5f5;
+      border-radius: 4px;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+    .success {
+      border-left: 4px solid #52c41a;
+    }
+    .error {
+      border-left: 4px solid #ff4d4f;
+    }
+    .log {
+      margin-top: 10px;
+      padding: 10px;
+      background-color: #fafafa;
+      border: 1px solid #e8e8e8;
+      border-radius: 4px;
+      font-size: 12px;
+      max-height: 200px;
+      overflow-y: auto;
+    }
+    input {
+      padding: 8px 12px;
+      margin: 5px;
+      border: 1px solid #d9d9d9;
+      border-radius: 4px;
+    }
+  </style>
+</head>
+<body>
+  <h1>词典搜索测试</h1>
+
+  <div class="test-section">
+    <h2>1. 测试词典数据加载</h2>
+    <button onclick="testDictionaryData()">加载词典数据</button>
+    <div id="dictionaryDataResult" class="result"></div>
+  </div>
+
+  <div class="test-section">
+    <h2>2. 测试简繁体转换</h2>
+    <input type="text" id="s2tInput" placeholder="输入简体中文" value="唔该">
+    <button onclick="testS2T()">转换</button>
+    <div id="s2tResult" class="result"></div>
+  </div>
+
+  <div class="test-section">
+    <h2>3. 测试 IndexedDB 操作</h2>
+    <button onclick="testIndexedDBInit()">初始化 IndexedDB</button>
+    <button onclick="testIndexedDBSearch('唔该')">搜索"唔该"</button>
+    <button onclick="testIndexedDBSearch('唔該')">搜索"唔該"</button>
+    <button onclick="testIndexedDBSearch('早晨')">搜索"早晨"</button>
+    <button onclick="testIndexedDBSearch('再見')">搜索"再見"</button>
+    <div id="indexedDBResult" class="result"></div>
+  </div>
+
+  <div class="test-section">
+    <h2>4. 测试网络请求</h2>
+    <input type="text" id="searchInput" placeholder="输入搜索词" value="唔该">
+    <button onclick="testNetworkSearch()">搜索</button>
+    <div id="networkResult" class="result"></div>
+  </div>
+
+  <div class="test-section">
+    <h2>日志</h2>
+    <div id="log" class="log"></div>
+  </div>
+
+  <script>
+    // 日志函数
+    function log(message, type = 'info') {
+      const logDiv = document.getElementById('log');
+      const timestamp = new Date().toLocaleTimeString();
+      const className = type === 'error' ? 'error' : 'success';
+      logDiv.innerHTML += `<div class="${className}">[${timestamp}] ${message}</div>`;
+      logDiv.scrollTop = logDiv.scrollHeight;
+    }
+
+    // 清空日志
+    function clearLog() {
+      document.getElementById('log').innerHTML = '';
+    }
+
+    // 1. 测试词典数据加载
+    async function testDictionaryData() {
+      const resultDiv = document.getElementById('dictionaryDataResult');
+      resultDiv.textContent = '加载中...';
+
+      try {
+        const response = await fetch('/static/data/dictionary.json');
+        const dictionary = await response.json();
+
+        const info = {
+          版本: dictionary.v,
+          日期: dictionary.date,
+          词条数: dictionary.stats.words,
+          音节数: dictionary.stats.syllables
+        };
+
+        // 测试查找
+        const findWord = (word) => dictionary.w.find(w => w.w === word);
+        const testWords = ['唔該', '早晨', '再見', '多謝'];
+
+        const found = testWords.map(word => {
+          const entry = findWord(word);
+          return entry ? `${word} ✓` : `${word} ✗`;
+        }).join('\n');
+
+        resultDiv.textContent = JSON.stringify(info, null, 2) + '\n\n测试词条:\n' + found;
+        log('词典数据加载成功，共 ' + dictionary.stats.words + ' 条词条');
+      } catch (error) {
+        resultDiv.textContent = '错误: ' + error.message;
+        log('词典数据加载失败: ' + error.message, 'error');
+      }
+    }
+
+    // 2. 测试简繁体转换
+    async function testS2T() {
+      const input = document.getElementById('s2tInput').value;
+      const resultDiv = document.getElementById('s2tResult');
+
+      try {
+        // 动态导入 chinese-s2t
+        const module = await import('https://cdn.jsdelivr.net/npm/chinese-s2t@1.0.0/index.js');
+
+        // 由于 CDN 版本可能不同，我们创建一个简单的映射表
+        const s2tMap = {
+          '该': '該',
+          '唔该': '唔該',
+          '吃饭': '吃飯',
+          '喝水': '喝水',
+          '睡觉': '睡覺',
+          '谢谢': '謝謝',
+          '对不起': '對不起',
+          '你好': '你好',
+          '再见': '再見'
+        };
+
+        const result = s2tMap[input] || input + ' (无转换)';
+
+        resultDiv.textContent = `${input} → ${result}`;
+        log(`简繁体转换: ${input} → ${result}`);
+      } catch (error) {
+        resultDiv.textContent = '错误: ' + error.message;
+        log('简繁体转换失败: ' + error.message, 'error');
+      }
+    }
+
+    // 3. 测试 IndexedDB 操作
+    const DB_NAME = 'CantoneseDictionaryDB';
+    const DB_VERSION = 1;
+    const STORE_NAME = 'dictionary';
+
+    let db = null;
+
+    async function testIndexedDBInit() {
+      const resultDiv = document.getElementById('indexedDBResult');
+      resultDiv.textContent = '初始化中...';
+
+      try {
+        const request = indexedDB.open(DB_NAME, DB_VERSION);
+
+        request.onsuccess = () => {
+          db = request.result;
+          resultDiv.textContent = 'IndexedDB 初始化成功';
+          log('IndexedDB 初始化成功');
+
+          // 检查数据
+          const transaction = db.transaction([STORE_NAME], 'readonly');
+          const store = transaction.objectStore(STORE_NAME);
+          const countRequest = store.count();
+
+          countRequest.onsuccess = () => {
+            log(`IndexedDB 中共有 ${countRequest.result} 条数据`);
+            if (countRequest.result === 0) {
+              resultDiv.textContent = 'IndexedDB 为空，需要加载数据';
+              log('IndexedDB 为空', 'error');
+            } else {
+              resultDiv.textContent += `\n共有 ${countRequest.result} 条数据`;
+            }
+          };
+        };
+
+        request.onerror = () => {
+          resultDiv.textContent = '错误: ' + request.error;
+          log('IndexedDB 初始化失败: ' + request.error, 'error');
+        };
+      } catch (error) {
+        resultDiv.textContent = '错误: ' + error.message;
+        log('IndexedDB 操作失败: ' + error.message, 'error');
+      }
+    }
+
+    async function testIndexedDBSearch(query) {
+      const resultDiv = document.getElementById('indexedDBResult');
+
+      if (!db) {
+        resultDiv.textContent = '请先初始化 IndexedDB';
+        log('请先初始化 IndexedDB', 'error');
+        return;
+      }
+
+      resultDiv.textContent = '搜索中...';
+      log(`IndexedDB 搜索: ${query}`);
+
+      try {
+        const transaction = db.transaction([STORE_NAME], 'readonly');
+        const store = transaction.objectStore(STORE_NAME);
+
+        // 直接查询
+        let request = store.get(query);
+
+        request.onsuccess = () => {
+          let wordEntry = request.result;
+
+          if (wordEntry) {
+            resultDiv.textContent = `找到: ${wordEntry.w} - ${wordEntry.j}`;
+            log(`直接查询成功: ${wordEntry.w}`);
+            return;
+          }
+
+          // 尝试繁体查询
+          const s2tMap = {
+            '该': '該',
+            '唔该': '唔該',
+            '吃饭': '吃飯',
+            '喝水': '喝水',
+            '睡觉': '睡覺',
+            '谢谢': '謝謝',
+            '对不起': '對不起'
+          };
+
+          const traditional = s2tMap[query];
+          if (traditional && traditional !== query) {
+            log(`尝试繁体查询: ${traditional}`);
+            request = store.get(traditional);
+
+            request.onsuccess = () => {
+              wordEntry = request.result;
+
+              if (wordEntry) {
+                resultDiv.textContent = `找到 (繁体): ${wordEntry.w} - ${wordEntry.j}`;
+                log(`繁体查询成功: ${wordEntry.w}`);
+              } else {
+                resultDiv.textContent = `未找到: ${query} 或 ${traditional}`;
+                log(`未找到词条: ${query}`, 'error');
+              }
+            };
+          } else {
+            resultDiv.textContent = `未找到: ${query}`;
+            log(`未找到词条: ${query}`, 'error');
+          }
+        };
+
+        request.onerror = () => {
+          resultDiv.textContent = '错误: ' + request.error;
+          log('IndexedDB 搜索失败: ' + request.error, 'error');
+        };
+      } catch (error) {
+        resultDiv.textContent = '错误: ' + error.message;
+        log('IndexedDB 搜索失败: ' + error.message, 'error');
+      }
+    }
+
+    // 4. 测试网络请求
+    async function testNetworkSearch() {
+      const query = document.getElementById('searchInput').value;
+      const resultDiv = document.getElementById('networkResult');
+
+      resultDiv.textContent = '搜索中...';
+      log(`网络搜索: ${query}`);
+
+      try {
+        // 模拟前端发送的请求
+        const response = await fetch('/api/dictionary/suggestions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ query })
+        });
+
+        const data = await response.json();
+
+        if (response.ok && data.code === 200) {
+          const suggestions = data.data || [];
+          resultDiv.textContent = `找到 ${suggestions.length} 条建议:\n` +
+            suggestions.map(s => `${s.word} (${s.jyutping})`).join('\n');
+          log(`网络搜索成功，找到 ${suggestions.length} 条建议`);
+        } else {
+          resultDiv.textContent = `错误: ${JSON.stringify(data)}`;
+          log('网络搜索失败: ' + JSON.stringify(data), 'error');
+        }
+      } catch (error) {
+        resultDiv.textContent = '错误: ' + error.message;
+        log('网络搜索失败: ' + error.message, 'error');
+      }
+    }
+
+    // 页面加载时自动运行测试
+    window.onload = () => {
+      log('页面加载完成，准备测试');
+      setTimeout(() => {
+        log('开始自动测试...');
+        testDictionaryData();
+      }, 500);
+    };
+  </script>
+</body>
+</html>

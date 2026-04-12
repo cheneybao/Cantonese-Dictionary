@@ -3,7 +3,9 @@
  * 无需后端，数据完全存储在浏览器本地
  */
 
-import { s2t } from 'chinese-s2t';
+import chineseS2t from 'chinese-s2t';
+
+const { s2t } = chineseS2t;
 
 // 数据类型定义
 export interface WordEntry {

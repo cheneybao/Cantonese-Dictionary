@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>IndexedDB 测试</title>
+  <style>
+    body { font-family: sans-serif; padding: 20px; max-width: 800px; margin: 0 auto; }
+    .test { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 8px; }
+    button { padding: 10px 20px; margin: 5px; background: #1890ff; color: white; border: none; border-radius: 5px; cursor: pointer; }
+    .result { margin-top: 10px; padding: 10px; background: #f5f5f5; border-radius: 4px; white-space: pre-wrap; }
+    .success { border-left: 4px solid #52c41a; }
+    .error { border-left: 4px solid #ff4d4f; }
+  </style>
+</head>
+<body>
+  <h1>IndexedDB 词典测试</h1>
+
+  <div class="test">
+    <h2>1. 检查 IndexedDB 状态</h2>
+    <button onclick="checkDB()">检查数据库</button>
+    <div id="dbResult" class="result"></div>
+  </div>
+
+  <div class="test">
+    <h2>2. 加载词典数据</h2>
+    <button onclick="loadDictionary()">加载数据</button>
+    <div id="loadResult" class="result"></div>
+  </div>
+
+  <div class="test">
+    <h2>3. 测试查询</h2>
+    <input id="searchInput" value="唔該" placeholder="输入查询词">
+    <button onclick="testQuery()">查询</button>
+    <div id="queryResult" class="result"></div>
+  </div>
+
+  <div class="test">
+    <h2>4. 测试简繁体转换</h2>
+    <input id="s2tInput" value="唔该" placeholder="输入简体">
+    <button onclick="testS2T()">转换</button>
+    <div id="s2tResult" class="result"></div>
+  </div>
+
+  <script>
+    const DB_NAME = 'CantoneseDictionaryDB';
+    const DB_VERSION = 1;
+    const STORE_NAME = 'dictionary';
+    let db = null;
+
+    function log(divId, message, type = 'info') {
+      const div = document.getElementById(divId);
+      const className = type === 'error' ? 'error' : 'success';
+      div.innerHTML = `<div class="${className}">${message}</div>`;
+    }
+
+    // 1. 检查数据库
+    async function checkDB() {
+      try {
+        const request = indexedDB.open(DB_NAME, DB_VERSION);
+
+        request.onsuccess = () => {
+          db = request.result;
+          const transaction = db.transaction([STORE_NAME], 'readonly');
+          const store = transaction.objectStore(STORE_NAME);
+          const countRequest = store.count();
+
+          countRequest.onsuccess = () => {
+            const count = countRequest.result;
+            log('dbResult', `数据库状态:\n- 名称: ${DB_NAME}\n- 版本: ${DB_VERSION}\n- 词条数: ${count}\n- 状态: ${count > 0 ? '已加载' : '空'}`);
+          };
+        };
+
+        request.onerror = () => {
+          log('dbResult', `错误: ${request.error}`, 'error');
+        };
+      } catch (error) {
+        log('dbResult', `错误: ${error.message}`, 'error');
+      }
+    }
+
+    // 2. 加载词典数据
+    async function loadDictionary() {
+      try {
+        log('loadResult', '正在加载词典数据...', 'info');
+
+        const response = await fetch('/static/data/dictionary.json');
+        const dictionary = await response.json();
+
+        log('loadResult', `词典数据下载成功:\n- 词条数: ${dictionary.stats.words}\n- 音节数: ${dictionary.stats.syllables}\n\n开始导入 IndexedDB...`, 'info');
+
+        // 打开数据库
+        const request = indexedDB.open(DB_NAME, DB_VERSION);
+
+        request.onsuccess = async () => {
+          db = request.result;
+
+          // 导入数据
+          const transaction = db.transaction([STORE_NAME], 'readwrite');
+          const store = transaction.objectStore(STORE_NAME);
+
+          // 清空旧数据
+          await new Promise((resolve, reject) => {
+            const clearRequest = store.clear();
+            clearRequest.onsuccess = resolve;
+            clearRequest.onerror = () => reject(clearRequest.error);
+          });
+
+          // 批量插入
+          let count = 0;
+          for (const word of dictionary.w) {
+            await new Promise((resolve, reject) => {
+              const addRequest = store.put(word);
+              addRequest.onsuccess = resolve;
+              addRequest.onerror = () => reject(addRequest.error);
+            });
+            count++;
+
+            if (count % 1000 === 0) {
+              log('loadResult', `已导入 ${count}/${dictionary.stats.words} 条...`, 'info');
+            }
+          }
+
+          transaction.oncomplete = () => {
+            log('loadResult', `导入完成！共导入 ${dictionary.stats.words} 条词条。`);
+          };
+
+          transaction.onerror = () => {
+            log('loadResult', `导入失败: ${transaction.error}`, 'error');
+          };
+        };
+
+        request.onerror = () => {
+          log('loadResult', `打开数据库失败: ${request.error}`, 'error');
+        };
+      } catch (error) {
+        log('loadResult', `错误: ${error.message}`, 'error');
+      }
+    }
+
+    // 3. 测试查询
+    async function testQuery() {
+      if (!db) {
+        log('queryResult', '请先检查数据库', 'error');
+        return;
+      }
+
+      const query = document.getElementById('searchInput').value;
+
+      try {
+        const transaction = db.transaction([STORE_NAME], 'readonly');
+        const store = transaction.objectStore(STORE_NAME);
+
+        // 直接查询
+        const request = store.get(query);
+
+        request.onsuccess = () => {
+          const wordEntry = request.result;
+
+          if (wordEntry) {
+            log('queryResult', `找到词条:\n- 词语: ${wordEntry.w}\n- 粤拼: ${wordEntry.j}\n- 释义: ${wordEntry.d || '无'}`);
+          } else {
+            log('queryResult', `未找到: ${query}\n\n尝试相关查询:`, 'error');
+
+            // 尝试模糊搜索
+            const searchRequest = store.openCursor();
+            const results = [];
+
+            searchRequest.onsuccess = (event) => {
+              const cursor = event.target.result;
+
+              if (cursor && results.length < 5) {
+                const word = cursor.value;
+
+                if (word.w.includes(query) || word.w.includes('唔') || word.w.includes('該')) {
+                  results.push(word);
+                }
+
+                cursor.continue();
+              } else {
+                if (results.length > 0) {
+                  const resultText = results.map(w => `- ${w.w} (${w.j})`).join('\n');
+                  log('queryResult', `相关词条:\n${resultText}`);
+                } else {
+                  log('queryResult', `未找到任何相关词条`, 'error');
+                }
+              }
+            };
+          }
+        };
+
+        request.onerror = () => {
+          log('queryResult', `查询失败: ${request.error}`, 'error');
+        };
+      } catch (error) {
+        log('queryResult', `错误: ${error.message}`, 'error');
+      }
+    }
+
+    // 4. 测试简繁体转换
+    async function testS2T() {
+      const input = document.getElementById('s2tInput').value;
+
+      try {
+        // 动态导入 chinese-s2t
+        const module = await import('https://cdn.jsdelivr.net/npm/chinese-s2t@1.0.0/index.js');
+
+        // CDN 版本可能需要不同的导入方式
+        // 这里使用简单的映射表进行测试
+        const s2tMap = {
+          '该': '該',
+          '唔该': '唔該',
+          '吃饭': '吃飯',
+          '喝水': '喝水',
+          '睡觉': '睡覺',
+          '谢谢': '謝謝',
+          '对不起': '對不起'
+        };
+
+        const result = s2tMap[input] || input + ' (无转换)';
+
+        log('s2tResult', `${input} → ${result}`);
+      } catch (error) {
+        log('s2tResult', `错误: ${error.message}`, 'error');
+      }
+    }
+
+    // 页面加载时自动检查数据库
+    window.onload = () => {
+      checkDB();
+    };
+  </script>
+</body>
+</html>
