@@ -2,6 +2,10 @@
   "version": 2,
   "cleanUrls": true,
   "trailingSlash": false,
+  "buildCommand": "bash scripts/vercel-build.sh",
+  "outputDirectory": "dist-web",
+  "installCommand": "pnpm install",
+  "devCommand": "pnpm dev:web",
   "headers": [
     {
       "source": "/(.*)",
@@ -58,36 +62,6 @@
           "value": "*"
         }
       ]
-    }
-  ],
-  "rewrites": [
-    {
-      "source": "/static/(.*)",
-      "destination": "/static/$1"
-    },
-    {
-      "source": "/assets/(.*)",
-      "destination": "/assets/$1"
-    },
-    {
-      "source": "/js/(.*)",
-      "destination": "/js/$1"
-    },
-    {
-      "source": "/css/(.*)",
-      "destination": "/css/$1"
-    },
-    {
-      "source": "/data/(.*)",
-      "destination": "/static/data/$1"
-    },
-    {
-      "source": "/index.html",
-      "destination": "/index.html"
-    },
-    {
-      "source": "/:match*",
-      "destination": "/index.html"
     }
   ]
 }
