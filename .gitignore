@@ -39,3 +39,10 @@ pnpm-debug.log*
 
 # Key
 # key/
+
+# 生成的词典数据
+src/data/dictionary.json
+
+# 备份和临时文件
+data/word-backup.csv
+data/word-extended.csv
