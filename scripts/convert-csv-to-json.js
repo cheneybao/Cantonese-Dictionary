@@ -38,6 +38,8 @@ dataLines.forEach((line) => {
   if (parts.length >= 2) {
     const word = parts[0];
     const pinyin = parts[1];
+    const definition = parts[2] || null;
+    const example = parts[3] || null;
 
     // 验证拼音有效性
     const hasValidSyllable = pinyin.split(' ').some(syl => {
@@ -48,8 +50,8 @@ dataLines.forEach((line) => {
       words.push({
         w: word,
         j: pinyin,
-        d: null,
-        e: null
+        d: definition,
+        e: example
       });
 
       // 收集音节
