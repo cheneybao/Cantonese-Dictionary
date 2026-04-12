@@ -467,7 +467,11 @@ class LocalDictionaryService {
               };
             }
           })
-          .filter((ex): ex is {chinese: string, jyutping: string, english?: string} => ex !== null && ex.chinese !== '');
+          .filter((ex): ex is NonNullable<typeof ex> => ex !== null && ex.chinese !== '') as Array<{
+            chinese: string;
+            jyutping: string;
+            english?: string;
+          }>;
       } catch (error) {
         console.error('[LocalDictionary] 解析例句失败:', error);
       }
