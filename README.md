@@ -1,24 +1,74 @@
-# Coze Mini Program
+# 🇭🇰 粤语词典 (Cantonese Dictionary)
 
-这是一个基于 [Taro 4](https://docs.taro.zone/docs/) + [Nest.js](https://nestjs.com/) 的前后端分离项目，由扣子编程 CLI 创建。
+一款离线优先的粤语学习工具，支持查词、粤拼检字、收藏等功能。
 
-## 技术栈
+## ✨ 功能特性
 
-- **整体框架**: Taro 4.1.9
-- **语言**: TypeScript 5.4.5
-- **渲染**: React 18.0.0
-- **样式**: TailwindCSS 4.1.18
-- **Tailwind 适配层**: weapp-tailwindcss 4.9.2
-- **状态管理**: Zustand 5.0.9
-- **图标库**: lucide-react-taro latest
-- **工程化**: Vite 4.2.0
-- **包管理**: pnpm
-- **运行时**: Node.js >= 18
-- **服务端**: NestJS 10.4.15
-- **数据库 ORM**: Drizzle ORM 0.45.1
-- **类型校验**: Zod 4.3.5
+- 🔍 **智能查词**：支持汉字、词语、粤拼音节搜索，实时联想
+- 🔤 **粤拼检字**：按声母浏览音节，查找同音字
+- 📖 **词条详情**：展示读音、释义、例句、相关词语
+- 📜 **历史记录**：自动保存查询历史，支持删除
+- ⭐ **收藏管理**：收藏常用词条，方便复习
+- 🎨 **现代 UI**：基于 shadcn/ui 组件库，美观易用
 
-## 项目结构
+## 🚀 快速开始
+
+### 本地开发
+
+```bash
+# 安装依赖
+pnpm install
+
+# 启动开发环境（H5 + 后端）
+pnpm dev
+
+# 访问 http://localhost:5000
+```
+
+### 构建部署
+
+```bash
+# 构建 H5 版本
+pnpm build:web
+
+# 构建微信小程序
+pnpm build:weapp
+
+# 构建抖音小程序
+pnpm build:tt
+```
+
+### 部署到 Vercel
+
+```bash
+# 安装 Vercel CLI
+npm install -g vercel
+
+# 构建并部署
+pnpm build:web
+vercel --prod
+```
+
+详细部署指南请查看 [VERCEL_DEPLOY_GUIDE.md](/VERCEL_DEPLOY_GUIDE.md)
+
+## 📱 在线预览
+
+当前项目支持多平台：
+
+- **H5 版本**：[在 Coze 预览区查看] 或 [部署到 Vercel](VERCEL_DEPLOY_GUIDE.md)
+- **抖音小程序**：需要企业账号注册
+- **微信小程序**：支持个人开发者
+
+## 🛠️ 技术栈
+
+- **前端**：Taro 4.1.9 + React 18 + TypeScript
+- **样式**：TailwindCSS 4.1.18 + shadcn/ui
+- **后端**：NestJS 10.4.15
+- **图标**：lucide-react-taro
+- **构建**：Vite 4.2.0
+- **包管理**：pnpm
+
+## 📦 项目结构
 
 ```
 ├── .cozeproj/                # Coze 平台配置
